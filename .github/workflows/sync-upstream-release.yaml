@@ -1,0 +1,116 @@
+name: Sync upstream release
+
+# Mirrors the latest release of the upstream repo (s1t5/mail-archiver) into this fork:
+# fetches upstream's newest release, merges it into main, and publishes a matching
+# release here. Creating the release with RELEASE_PAT (instead of the default
+# GITHUB_TOKEN) is what lets the downstream "Publish Docker image" workflow fire.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # daily at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: sync-upstream-release
+  cancel-in-progress: false
+
+env:
+  UPSTREAM: s1t5/mail-archiver
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out fork (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PAT }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine latest upstream release
+        id: upstream
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          TAG=$(gh api "repos/${UPSTREAM}/releases/latest" --jq .tag_name)
+          if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
+            echo "::error::Could not determine latest upstream release."
+            exit 1
+          fi
+          echo "Latest upstream release: $TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if fork already has this release
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          if gh release view "${{ steps.upstream.outputs.tag }}" -R "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "Release ${{ steps.upstream.outputs.tag }} already exists in this fork - nothing to do."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Merge upstream release into main
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          TAG="${{ steps.upstream.outputs.tag }}"
+          git remote add upstream "https://github.com/${UPSTREAM}.git"
+          # Fetch only this release tag, namespaced so it can't collide with the fork
+          # release tag we create later.
+          git fetch upstream "refs/tags/${TAG}:refs/tags/upstream-${TAG}"
+          if ! git merge --no-edit "upstream-${TAG}"; then
+            git merge --abort
+            echo "conflict=true" >> "$GITHUB_ENV"
+            echo "::error::Merge conflict while syncing upstream ${TAG}. Manual resolution required."
+            exit 1
+          fi
+          git push origin HEAD:main
+
+      - name: Open issue on merge conflict
+        if: failure() && env.conflict == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          TAG="${{ steps.upstream.outputs.tag }}"
+          {
+            printf '%s\n\n' "Automatic merge of upstream release \`${TAG}\` failed due to conflicts and was aborted. No changes were pushed."
+            printf '%s\n\n' "Resolve manually:"
+            printf '%s\n' '```bash'
+            printf 'git fetch https://github.com/%s.git tag %s\n' "$UPSTREAM" "$TAG"
+            printf 'git merge %s\n' "$TAG"
+            printf '%s\n' '# resolve conflicts, commit, then push'
+            printf 'git push origin main\n'
+            printf '%s\n\n' '```'
+            printf '%s\n' "Then re-run the **Sync upstream release** workflow to publish the release."
+          } > issue-body.md
+          gh issue create -R "${{ github.repository }}" \
+            --title "Upstream sync conflict: ${TAG}" \
+            --body-file issue-body.md
+
+      - name: Create fork release
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          TAG="${{ steps.upstream.outputs.tag }}"
+          UPSTREAM_NOTES=$(gh api "repos/${UPSTREAM}/releases/tags/${TAG}" --jq '.body // ""')
+          {
+            printf 'Synced from upstream [%s %s](https://github.com/%s/releases/tag/%s).\n\n' "$UPSTREAM" "$TAG" "$UPSTREAM" "$TAG"
+            printf -- '---\n\n'
+            printf '%s\n' "$UPSTREAM_NOTES"
+          } > release-notes.md
+          gh release create "$TAG" -R "${{ github.repository }}" \
+            --target main \
+            --title "$TAG" \
+            --notes-file release-notes.md
