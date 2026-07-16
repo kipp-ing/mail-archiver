@@ -8,6 +8,13 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+        (function() {
+            var t = localStorage.getItem('theme');
+            if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+        })();
+    </script>
     <title>@ViewData["Title"] - Mail-Archiver</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/lib/bootstrap-icons/bootstrap-icons.css">
@@ -102,12 +109,6 @@
                             <a class="nav-link @(ViewContext.RouteData.Values["Controller"].ToString() == "Logs" ? "active" : "")"
                                 asp-controller="Logs" asp-action="Index">
                                 <i class="bi bi-list-check me-1"></i>@Localizer["Log"]
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link @(ViewContext.RouteData.Values["Controller"].ToString() == "ApiKeys" ? "active" : "")"
-                                asp-controller="ApiKeys" asp-action="Index">
-                                <i class="bi bi-key me-1"></i>@Localizer["ApiKeys"]
                             </a>
                         </li>
                     </ul>
