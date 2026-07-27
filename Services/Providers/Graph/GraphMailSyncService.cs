@@ -1,5 +1,6 @@
 using MailArchiver.Data;
 using MailArchiver.Models;
+using MailArchiver.Services.Shared;
 using MailArchiver.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -704,6 +705,7 @@ namespace MailArchiver.Services.Providers.Graph
                         int totalOldEmailsFound = 0;
                         int totalProcessedInFolder = 0;
                         int paginationCount = 0;
+                        var folderRefusedCount = 0;
 
                         while (messagesResponse?.Value != null)
                         {
@@ -720,7 +722,35 @@ namespace MailArchiver.Services.Providers.Graph
 
                                 foreach (var message in messagesResponse.Value)
                                 {
-                                    var messageId = message.InternetMessageId ?? message.Id;
+                                    // SAFETY GUARD: re-verify client-side that the message really is older
+                                    // than the cutoff. The server-side filter (receivedDateTime lt cutoff)
+                                    // above is the primary date filter, but for an irreversible deletion
+                                    // on the live mailbox a second client-side check is kept as defensive
+                                    // depth regardless of provider reliability.
+                                    //
+                                    // Policy: if a usable date is available, refuse to delete anything
+                                    // not actually older than the cutoff. If no date can be determined
+                                    // client-side, proceed per the server filter and log a warning -
+                                    // this intentionally trusts the server in the null case rather than
+                                    // skipping, which could leave mails undeletable indefinitely.
+                                    DateTime? guardDate = message.ReceivedDateTime?.UtcDateTime;
+
+                                    if (guardDate.HasValue && guardDate.Value >= cutoffDate)
+                                    {
+                                        folderRefusedCount++;
+                                        _logger.LogWarning("Refusing to delete message {MessageId} in folder {FolderName}: received date {Date} is not older than cutoff {Cutoff} (server filter returned it incorrectly). Account ID: {AccountId}",
+                                            message.Id, folder.DisplayName, guardDate.Value.ToString("u"), cutoffDate.ToString("u"), account.Id);
+                                        continue;
+                                    }
+
+                                    if (!guardDate.HasValue)
+                                    {
+                                        _logger.LogWarning("Proceeding with deletion of message {MessageId} in folder {FolderName}: client-side received date unavailable, trusting server-side filter. Account ID: {AccountId}",
+                                            message.Id, folder.DisplayName, account.Id);
+                                    }
+
+                                    var rawMessageId = message.InternetMessageId ?? message.Id;
+                                    var normalizedMessageId = MailContentHelper.NormalizeMessageId(rawMessageId);
 
                                     // MEMORY FIX: Existence check only – use AsNoTracking with an Id
                                     // projection so the change tracker does not accumulate full
@@ -728,41 +758,20 @@ namespace MailArchiver.Services.Providers.Graph
                                     var archivedEmailId = await _context.ArchivedEmails
                                         .AsNoTracking()
                                         .Where(e => e.MailAccountId == account.Id)
-                                        .Where(e => e.MessageId == messageId)
+                                        .Where(e => e.MessageId == normalizedMessageId)
                                         .Select(e => (int?)e.Id)
                                         .FirstOrDefaultAsync();
-
-                                    if (archivedEmailId == null && !string.IsNullOrEmpty(messageId) && !messageId.StartsWith("<"))
-                                    {
-                                        var messageIdWithBrackets = $"<{messageId}>";
-                                        archivedEmailId = await _context.ArchivedEmails
-                                            .AsNoTracking()
-                                            .Where(e => e.MailAccountId == account.Id)
-                                            .Where(e => e.MessageId == messageIdWithBrackets)
-                                            .Select(e => (int?)e.Id)
-                                            .FirstOrDefaultAsync();
-                                    }
-                                    else if (archivedEmailId == null && !string.IsNullOrEmpty(messageId) && messageId.StartsWith("<") && messageId.EndsWith(">"))
-                                    {
-                                        var messageIdWithoutBrackets = messageId.Substring(1, messageId.Length - 2);
-                                        archivedEmailId = await _context.ArchivedEmails
-                                            .AsNoTracking()
-                                            .Where(e => e.MailAccountId == account.Id)
-                                            .Where(e => e.MessageId == messageIdWithoutBrackets)
-                                            .Select(e => (int?)e.Id)
-                                            .FirstOrDefaultAsync();
-                                    }
 
                                     if (archivedEmailId != null)
                                     {
                                         messageIdsToDelete.Add(message.Id!);
-                                            _logger.LogDebug("Marking email with Message-ID {MessageId} for deletion from folder {FolderName}",
-                                                messageId, folder.DisplayName);
+                                        _logger.LogDebug("Marking email with Message-ID {MessageId} (raw: {RawMessageId}) for deletion from folder {FolderName}",
+                                            normalizedMessageId, rawMessageId, folder.DisplayName);
                                     }
                                     else
                                     {
-                                        _logger.LogDebug("Skipping deletion of email with Message-ID {MessageId} from folder {FolderName} (not archived).",
-                                            messageId, folder.DisplayName);
+                                        _logger.LogDebug("Skipping deletion of email with Message-ID {MessageId} (raw: {RawMessageId}) from folder {FolderName} (not archived).",
+                                            normalizedMessageId, rawMessageId, folder.DisplayName);
                                     }
                                 }
 
@@ -806,6 +815,12 @@ namespace MailArchiver.Services.Providers.Graph
 
                         _logger.LogInformation("Completed deletion processing for folder {FolderName}. Total found: {TotalFound}, Pages: {PagesProcessed}, Deleted: {DeletedInFolder}",
                             folder.DisplayName, totalOldEmailsFound, paginationCount, totalProcessedInFolder);
+
+                        if (folderRefusedCount > 0)
+                        {
+                            _logger.LogWarning("Refused deletion of {Count} email(s) in folder {FolderName} for account {AccountName} because the server filter returned messages newer than the cutoff. The mailbox was not modified for these messages.",
+                                folderRefusedCount, folder.DisplayName, account.Name);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -822,6 +837,28 @@ namespace MailArchiver.Services.Providers.Graph
 
             _logger.LogInformation("Completed deletion process for M365 account {AccountName}. Deleted {Count} emails",
                 account.Name, deletedCount);
+
+            if (deletedCount > 0)
+            {
+                try
+                {
+                    var accessLog = new AccessLog
+                    {
+                        Username = "System",
+                        Type = AccessLogType.Retention,
+                        Timestamp = DateTime.UtcNow,
+                        SearchParameters = $"Retention (M365): Deleted {deletedCount} emails older than {account.DeleteAfterDays} days from mailbox",
+                        MailAccountId = account.Id
+                    };
+
+                    _context.AccessLogs.Add(accessLog);
+                    await _context.SaveChangesAsync();
+                }
+                catch (Exception logEx)
+                {
+                    _logger.LogWarning(logEx, "Failed to log retention deletion summary for account {AccountName} to AccessLogs", account.Name);
+                }
+            }
 
             return deletedCount;
         }

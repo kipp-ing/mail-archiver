@@ -2541,6 +2541,12 @@
   <data name="DeletionPolicy" xml:space="preserve">
     <value>Política de eliminación</value>
   </data>
+  <data name="SyncAcknowledgeFailures" xml:space="preserve">
+    <value>Fallos de sincronización confirmados</value>
+  </data>
+  <data name="Retention" xml:space="preserve">
+    <value>Retención</value>
+  </data>
   <data name="DeletionDisabledMessage" xml:space="preserve">
     <value>La eliminación de correos está deshabilitada por configuración.</value>
   </data>
@@ -3141,5 +3147,38 @@
   </data>
   <data name="Copy" xml:space="preserve">
     <value>Copiar</value>
+  </data>
+  <data name="MeetingInvitation" xml:space="preserve">
+    <value>Invitación a reunión</value>
+  </data>
+  <data name="MeetingStart" xml:space="preserve">
+    <value>Inicio</value>
+  </data>
+  <data name="MeetingEnd" xml:space="preserve">
+    <value>Fin</value>
+  </data>
+  <data name="MeetingLocation" xml:space="preserve">
+    <value>Ubicación</value>
+  </data>
+  <data name="MeetingOrganizer" xml:space="preserve">
+    <value>Organizador</value>
+  </data>
+  <data name="MeetingAttendees" xml:space="preserve">
+    <value>Asistentes</value>
+  </data>
+  <data name="MeetingDescription" xml:space="preserve">
+    <value>Descripción</value>
+  </data>
+  <data name="AcknowledgeFailures" xml:space="preserve">
+    <value>Reconocer fallos</value>
+  </data>
+  <data name="AcknowledgeFailuresConfirm" xml:space="preserve">
+    <value>Esto avanzará la marca de tiempo de sincronización al momento de finalización de este trabajo, por lo que la próxima sincronización será incremental normal. Los correos fallidos no se reintentarán. ¿Continuar?</value>
+  </data>
+  <data name="AcknowledgeFailuresSuccess" xml:space="preserve">
+    <value>La marca de tiempo de sincronización se ha avanzado. La próxima sincronización será incremental.</value>
+  </data>
+  <data name="FailuresAcknowledged" xml:space="preserve">
+    <value>Fallos reconocidos</value>
   </data>
 </root>

@@ -2542,6 +2542,12 @@
   <data name="DeletionPolicy" xml:space="preserve">
     <value>Politique de suppression</value>
   </data>
+  <data name="SyncAcknowledgeFailures" xml:space="preserve">
+    <value>Échecs de synchronisation confirmés</value>
+  </data>
+  <data name="Retention" xml:space="preserve">
+    <value>Rétention</value>
+  </data>
   <data name="DeletionDisabledMessage" xml:space="preserve">
     <value>La suppression des e-mails est désactivée par configuration.</value>
   </data>
@@ -3142,5 +3148,38 @@
   </data>
   <data name="Copy" xml:space="preserve">
     <value>Copier</value>
+  </data>
+  <data name="MeetingInvitation" xml:space="preserve">
+    <value>Invitation à une réunion</value>
+  </data>
+  <data name="MeetingStart" xml:space="preserve">
+    <value>Début</value>
+  </data>
+  <data name="MeetingEnd" xml:space="preserve">
+    <value>Fin</value>
+  </data>
+  <data name="MeetingLocation" xml:space="preserve">
+    <value>Lieu</value>
+  </data>
+  <data name="MeetingOrganizer" xml:space="preserve">
+    <value>Organisateur</value>
+  </data>
+  <data name="MeetingAttendees" xml:space="preserve">
+    <value>Participants</value>
+  </data>
+  <data name="MeetingDescription" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="AcknowledgeFailures" xml:space="preserve">
+    <value>Reconnaître les échecs</value>
+  </data>
+  <data name="AcknowledgeFailuresConfirm" xml:space="preserve">
+    <value>Cela avancera l'horodatage de synchronisation à l'heure d'achèvement de ce travail, donc la prochaine synchronisation sera une synchronisation incrémentale normale. Les e-mails échoués ne seront pas réessayés. Continuer ?</value>
+  </data>
+  <data name="AcknowledgeFailuresSuccess" xml:space="preserve">
+    <value>L'horodatage de synchronisation a été avancé. La prochaine synchronisation sera incrémentale.</value>
+  </data>
+  <data name="FailuresAcknowledged" xml:space="preserve">
+    <value>Échecs reconnus</value>
   </data>
 </root>

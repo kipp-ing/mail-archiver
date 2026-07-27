@@ -2546,6 +2546,12 @@
   <data name="DeletionPolicy" xml:space="preserve">
     <value>Löschrichtlinie</value>
   </data>
+  <data name="SyncAcknowledgeFailures" xml:space="preserve">
+    <value>Sync-Fehler bestätigt</value>
+  </data>
+  <data name="Retention" xml:space="preserve">
+    <value>Aufbewahrung</value>
+  </data>
   <data name="DeletionDisabledMessage" xml:space="preserve">
     <value>Das Löschen von E-Mails ist durch die Konfiguration deaktiviert.</value>
   </data>
@@ -3143,5 +3149,38 @@
   </data>
   <data name="Copy" xml:space="preserve">
     <value>Kopieren</value>
+  </data>
+  <data name="MeetingInvitation" xml:space="preserve">
+    <value>Terminvorschlag</value>
+  </data>
+  <data name="MeetingStart" xml:space="preserve">
+    <value>Beginn</value>
+  </data>
+  <data name="MeetingEnd" xml:space="preserve">
+    <value>Ende</value>
+  </data>
+  <data name="MeetingLocation" xml:space="preserve">
+    <value>Ort</value>
+  </data>
+  <data name="MeetingOrganizer" xml:space="preserve">
+    <value>Organisator</value>
+  </data>
+  <data name="MeetingAttendees" xml:space="preserve">
+    <value>Teilnehmer</value>
+  </data>
+  <data name="MeetingDescription" xml:space="preserve">
+    <value>Beschreibung</value>
+  </data>
+  <data name="AcknowledgeFailures" xml:space="preserve">
+    <value>Fehler bestätigen</value>
+  </data>
+  <data name="AcknowledgeFailuresConfirm" xml:space="preserve">
+    <value>Dadurch wird der Synchronisationszeitstempel auf den Abschlusszeitpunkt dieses Jobs gesetzt, sodass die nächste Synchronisation ein normaler inkrementeller Sync wird. Die fehlgeschlagenen E-Mails werden nicht erneut versucht. Fortfahren?</value>
+  </data>
+  <data name="AcknowledgeFailuresSuccess" xml:space="preserve">
+    <value>Synchronisationszeitstempel wurde aktualisiert. Die nächste Synchronisation wird inkrementell sein.</value>
+  </data>
+  <data name="FailuresAcknowledged" xml:space="preserve">
+    <value>Fehler bestätigt</value>
   </data>
 </root>

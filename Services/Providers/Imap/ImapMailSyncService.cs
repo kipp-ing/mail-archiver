@@ -2,6 +2,7 @@ using MailArchiver.Data;
 using MailArchiver.Models;
 using MailArchiver.Services.Core;
 using MailArchiver.Services.Providers.Eml;
+using MailArchiver.Services.Shared;
 using MailArchiver.Utilities;
 using MailKit;
 using MailKit.Net.Imap;
@@ -1003,26 +1004,6 @@ namespace MailArchiver.Services.Providers.Imap
                         _logger.LogInformation("SearchQuery.SentBefore found {Count} emails in folder {FolderName} for account {AccountName}",
                             uids.Count, folder.FullName, account.Name);
 
-                        if (uids.Any())
-                        {
-                            var summaries = await folder.FetchAsync(uids.Take(10).ToList(), MessageSummaryItems.UniqueId | MessageSummaryItems.Envelope | MessageSummaryItems.InternalDate);
-
-                            foreach (var summary in summaries)
-                            {
-                                DateTime? emailDate = null;
-
-                                if (summary.Envelope?.Date.HasValue == true)
-                                {
-                                    emailDate = DateTime.SpecifyKind(summary.Envelope.Date.Value.DateTime, DateTimeKind.Utc);
-                                }
-
-                                _logger.LogDebug("Email UID: {UniqueId}, Date: {EmailDate}, Cutoff: {CutoffDate}, IsOld: {IsOld}, Subject: {Subject}",
-                                    summary.UniqueId, emailDate?.ToString() ?? "NULL", cutoffDate,
-                                    emailDate.HasValue && emailDate.Value < cutoffDate,
-                                    summary.Envelope?.Subject ?? "NULL");
-                            }
-                        }
-
                         if (uids.Count == 0)
                         {
                             _logger.LogInformation("No old emails found in folder {FolderName} for account {AccountName}",
@@ -1034,67 +1015,86 @@ namespace MailArchiver.Services.Providers.Imap
                             uids.Count, folder.FullName, account.Name);
 
                         var batchSize = _batchOptions.BatchSize;
+                        var folderRefusedCount = 0;
+
                         for (int i = 0; i < uids.Count; i += batchSize)
                         {
                             var batch = uids.Skip(i).Take(batchSize).ToList();
 
-                            var messageSummaries = await folder.FetchAsync(batch, MessageSummaryItems.UniqueId | MessageSummaryItems.Headers);
+                            var messageSummaries = await folder.FetchAsync(batch, MessageSummaryItems.UniqueId | MessageSummaryItems.Headers | MessageSummaryItems.InternalDate | MessageSummaryItems.Envelope);
 
                             var uidsToDelete = new List<UniqueId>();
 
                             foreach (var summary in messageSummaries)
                             {
-                                var messageId = summary.Headers["Message-ID"];
+                                // SAFETY GUARD: re-verify client-side that the message really is older
+                                // than the cutoff. The server-side SearchQuery.SentBefore above is the
+                                // primary date filter, but some IMAP servers (notably Yandex) return
+                                // non-compliant results for SENTBEFORE - which would otherwise delete
+                                // recent mail and cause irreversible data loss on the live mailbox.
+                                //
+                                // Policy: if a usable date is available, refuse to delete anything
+                                // not actually older than the cutoff. If no date can be determined
+                                // client-side, proceed per the server filter and log a warning -
+                                // this intentionally trusts the server in the null case rather than
+                                // skipping, which could leave mails undeletable indefinitely.
+                                DateTime? guardDate = null;
+                                if (summary.Envelope?.Date.HasValue == true)
+                                    guardDate = summary.Envelope.Date.Value.UtcDateTime;
+                                else if (summary.InternalDate.HasValue)
+                                    guardDate = summary.InternalDate.Value.UtcDateTime;
 
-                                _logger.LogDebug("Raw Message-ID from IMAP: {RawMessageId}", messageId ?? "NULL");
+                                if (guardDate.HasValue && guardDate.Value >= cutoffDate)
+                                {
+                                    folderRefusedCount++;
+                                    _logger.LogWarning("Refusing to delete UID {Uid} in folder {FolderName}: message date {Date} is not older than cutoff {Cutoff} (server SENTBEFORE returned it incorrectly). Account ID: {AccountId}",
+                                        summary.UniqueId, folder.FullName, guardDate.Value.ToString("u"), cutoffDate.ToString("u"), account.Id);
+                                    continue;
+                                }
 
-                                if (string.IsNullOrEmpty(messageId))
+                                if (!guardDate.HasValue)
+                                {
+                                    _logger.LogWarning("Proceeding with deletion of UID {Uid} in folder {FolderName}: client-side message date unavailable, trusting server-side SENTBEFORE filter. Account ID: {AccountId}",
+                                        summary.UniqueId, folder.FullName, account.Id);
+                                }
+
+                                var rawMessageId = summary.Envelope?.MessageId;
+                                if (string.IsNullOrEmpty(rawMessageId))
+                                    rawMessageId = summary.Headers["Message-ID"];
+
+                                _logger.LogDebug("Raw Message-ID from IMAP: {RawMessageId}", rawMessageId ?? "NULL");
+
+                                string normalizedMessageId;
+                                if (string.IsNullOrEmpty(rawMessageId))
                                 {
                                     var from = summary.Envelope?.From?.ToString() ?? string.Empty;
                                     var to = summary.Envelope?.To?.ToString() ?? string.Empty;
                                     var subject = summary.Envelope?.Subject ?? string.Empty;
                                     var dateTicks = summary.InternalDate?.Ticks ?? 0;
 
-                                    messageId = $"{from}-{to}-{subject}-{dateTicks}";
-                                    _logger.LogDebug("Constructed Message-ID: {ConstructedMessageId}", messageId);
+                                    normalizedMessageId = $"{from}-{to}-{subject}-{dateTicks}";
+                                    _logger.LogDebug("Constructed Message-ID (no header): {ConstructedMessageId}", normalizedMessageId);
+                                }
+                                else
+                                {
+                                    normalizedMessageId = MailContentHelper.NormalizeMessageId(rawMessageId);
+                                    _logger.LogDebug("Message-ID: raw={RawMessageId}, normalized={NormalizedMessageId}",
+                                        rawMessageId, normalizedMessageId);
                                 }
 
                                 var isArchived = await _context.ArchivedEmails
-                                    .AnyAsync(e => e.MessageId == messageId && e.MailAccountId == account.Id);
-
-                                if (!isArchived && !string.IsNullOrEmpty(messageId) && !messageId.StartsWith("<"))
-                                {
-                                    var messageIdWithBrackets = $"<{messageId}>";
-                                    isArchived = await _context.ArchivedEmails
-                                        .AnyAsync(e => e.MessageId == messageIdWithBrackets && e.MailAccountId == account.Id);
-
-                                    if (isArchived)
-                                    {
-                                        _logger.LogDebug("Found email with Message-ID {MessageId} when checking with angle brackets", messageIdWithBrackets);
-                                    }
-                                }
-                                else if (!isArchived && !string.IsNullOrEmpty(messageId) && messageId.StartsWith("<") && messageId.EndsWith(">"))
-                                {
-                                    var messageIdWithoutBrackets = messageId.Substring(1, messageId.Length - 2);
-                                    isArchived = await _context.ArchivedEmails
-                                        .AnyAsync(e => e.MessageId == messageIdWithoutBrackets && e.MailAccountId == account.Id);
-
-                                    if (isArchived)
-                                    {
-                                        _logger.LogDebug("Found email with Message-ID {MessageId} when checking without angle brackets", messageIdWithoutBrackets);
-                                    }
-                                }
+                                    .AnyAsync(e => e.MessageId == normalizedMessageId && e.MailAccountId == account.Id);
 
                                 if (isArchived)
                                 {
                                     uidsToDelete.Add(summary.UniqueId);
                                     _logger.LogDebug("Marking email with Message-ID {MessageId} for deletion from folder {FolderName}",
-                                        messageId, folder.FullName);
+                                        normalizedMessageId, folder.FullName);
                                 }
                                 else
                                 {
-                                    _logger.LogInformation("Skipping deletion of email with Message-ID {MessageId} from folder {FolderName} (not archived). Account ID: {AccountId}",
-                                        messageId, folder.FullName, account.Id);
+                                    _logger.LogInformation("Skipping deletion of email with Message-ID {MessageId} (raw: {RawMessageId}) from folder {FolderName} (not archived). Account ID: {AccountId}",
+                                        normalizedMessageId, rawMessageId ?? "NULL", folder.FullName, account.Id);
                                 }
                             }
 
@@ -1153,6 +1153,12 @@ namespace MailArchiver.Services.Providers.Imap
                                 await Task.Delay(_batchOptions.PauseBetweenBatchesMs);
                             }
                         }
+
+                        if (folderRefusedCount > 0)
+                        {
+                            _logger.LogWarning("Refused deletion of {Count} email(s) in folder {FolderName} for account {AccountName} because the server SENTBEFORE filter returned messages newer than the cutoff. The mailbox was not modified for these messages.",
+                                folderRefusedCount, folder.FullName, account.Name);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -1169,6 +1175,28 @@ namespace MailArchiver.Services.Providers.Imap
 
             _logger.LogInformation("Completed deletion process for account {AccountName}. Deleted {Count} emails",
                 account.Name, deletedCount);
+
+            if (deletedCount > 0)
+            {
+                try
+                {
+                    var accessLog = new AccessLog
+                    {
+                        Username = "System",
+                        Type = AccessLogType.Retention,
+                        Timestamp = DateTime.UtcNow,
+                        SearchParameters = $"Retention (IMAP): Deleted {deletedCount} emails older than {account.DeleteAfterDays} days from mailbox",
+                        MailAccountId = account.Id
+                    };
+
+                    _context.AccessLogs.Add(accessLog);
+                    await _context.SaveChangesAsync();
+                }
+                catch (Exception logEx)
+                {
+                    _logger.LogWarning(logEx, "Failed to log retention deletion summary for account {AccountName} to AccessLogs", account.Name);
+                }
+            }
 
             return deletedCount;
         }

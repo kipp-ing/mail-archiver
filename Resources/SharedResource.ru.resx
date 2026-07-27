@@ -2542,6 +2542,12 @@
   <data name="DeletionPolicy" xml:space="preserve">
     <value>Политика удаления</value>
   </data>
+  <data name="SyncAcknowledgeFailures" xml:space="preserve">
+    <value>Ошибки синхронизации подтверждены</value>
+  </data>
+  <data name="Retention" xml:space="preserve">
+    <value>Хранение</value>
+  </data>
   <data name="DeletionDisabledMessage" xml:space="preserve">
     <value>Удаление писем отключено в конфигурации.</value>
   </data>
@@ -3142,5 +3148,38 @@
   </data>
   <data name="Copy" xml:space="preserve">
     <value>Копировать</value>
+  </data>
+  <data name="MeetingInvitation" xml:space="preserve">
+    <value>Приглашение на собрание</value>
+  </data>
+  <data name="MeetingStart" xml:space="preserve">
+    <value>Начало</value>
+  </data>
+  <data name="MeetingEnd" xml:space="preserve">
+    <value>Конец</value>
+  </data>
+  <data name="MeetingLocation" xml:space="preserve">
+    <value>Место</value>
+  </data>
+  <data name="MeetingOrganizer" xml:space="preserve">
+    <value>Организатор</value>
+  </data>
+  <data name="MeetingAttendees" xml:space="preserve">
+    <value>Участники</value>
+  </data>
+  <data name="MeetingDescription" xml:space="preserve">
+    <value>Описание</value>
+  </data>
+  <data name="AcknowledgeFailures" xml:space="preserve">
+    <value>Подтвердить ошибки</value>
+  </data>
+  <data name="AcknowledgeFailuresConfirm" xml:space="preserve">
+    <value>Это переведёт метку времени синхронизации на время завершения этого задания, поэтому следующая синхронизация будет обычной инкрементной. Неудачные письма не будут повторены. Продолжить?</value>
+  </data>
+  <data name="AcknowledgeFailuresSuccess" xml:space="preserve">
+    <value>Метка времени синхронизации была перемещена вперёд. Следующая синхронизация будет инкрементной.</value>
+  </data>
+  <data name="FailuresAcknowledged" xml:space="preserve">
+    <value>Ошибки подтверждены</value>
   </data>
 </root>

@@ -542,4 +542,37 @@
   <data name="Copy" xml:space="preserve">
     <value>Copy</value>
   </data>
+  <data name="MeetingInvitation" xml:space="preserve">
+    <value>Meeting Invitation</value>
+  </data>
+  <data name="MeetingStart" xml:space="preserve">
+    <value>Start</value>
+  </data>
+  <data name="MeetingEnd" xml:space="preserve">
+    <value>End</value>
+  </data>
+  <data name="MeetingLocation" xml:space="preserve">
+    <value>Location</value>
+  </data>
+  <data name="MeetingOrganizer" xml:space="preserve">
+    <value>Organiser</value>
+  </data>
+  <data name="MeetingAttendees" xml:space="preserve">
+    <value>Attendees</value>
+  </data>
+  <data name="MeetingDescription" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="AcknowledgeFailures" xml:space="preserve">
+    <value>Acknowledge Failures</value>
+  </data>
+  <data name="AcknowledgeFailuresConfirm" xml:space="preserve">
+    <value>This will advance the sync timestamp to the completion time of this job, so the next sync will be a normal incremental sync. The failed emails will not be retried. Continue?</value>
+  </data>
+  <data name="AcknowledgeFailuresSuccess" xml:space="preserve">
+    <value>Sync timestamp has been advanced. The next sync will be incremental.</value>
+  </data>
+  <data name="FailuresAcknowledged" xml:space="preserve">
+    <value>Failures acknowledged</value>
+  </data>
 </root>

@@ -2542,6 +2542,12 @@
   <data name="DeletionPolicy" xml:space="preserve">
     <value>Criterio di eliminazione</value>
   </data>
+  <data name="SyncAcknowledgeFailures" xml:space="preserve">
+    <value>Errori di sincronizzazione confermati</value>
+  </data>
+  <data name="Retention" xml:space="preserve">
+    <value>Conservazione</value>
+  </data>
   <data name="DeletionDisabledMessage" xml:space="preserve">
     <value>L'eliminazione delle e-mail è disabilitata dalla configurazione.</value>
   </data>
@@ -3142,5 +3148,38 @@
   </data>
   <data name="Copy" xml:space="preserve">
     <value>Copia</value>
+  </data>
+  <data name="MeetingInvitation" xml:space="preserve">
+    <value>Invito alla riunione</value>
+  </data>
+  <data name="MeetingStart" xml:space="preserve">
+    <value>Inizio</value>
+  </data>
+  <data name="MeetingEnd" xml:space="preserve">
+    <value>Fine</value>
+  </data>
+  <data name="MeetingLocation" xml:space="preserve">
+    <value>Luogo</value>
+  </data>
+  <data name="MeetingOrganizer" xml:space="preserve">
+    <value>Organizzatore</value>
+  </data>
+  <data name="MeetingAttendees" xml:space="preserve">
+    <value>Partecipanti</value>
+  </data>
+  <data name="MeetingDescription" xml:space="preserve">
+    <value>Descrizione</value>
+  </data>
+  <data name="AcknowledgeFailures" xml:space="preserve">
+    <value>Riconosci errori</value>
+  </data>
+  <data name="AcknowledgeFailuresConfirm" xml:space="preserve">
+    <value>Questo farà avanzare il timestamp di sincronizzazione all'ora di completamento di questo processo, quindi la prossima sincronizzazione sarà una sincronizzazione incrementale normale. Le email fallite non verranno ritentate. Continuare?</value>
+  </data>
+  <data name="AcknowledgeFailuresSuccess" xml:space="preserve">
+    <value>Il timestamp di sincronizzazione è stato avanzato. La prossima sincronizzazione sarà incrementale.</value>
+  </data>
+  <data name="FailuresAcknowledged" xml:space="preserve">
+    <value>Errori riconosciuti</value>
   </data>
 </root>

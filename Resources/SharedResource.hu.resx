@@ -2532,7 +2532,13 @@
     <value>Szinkronizálás megszakítva</value>
   </data>
   <data name="DeletionPolicy" xml:space="preserve">
-    <value>Törlési házirend</value>
+    <value>Törlési szabályzat</value>
+  </data>
+  <data name="SyncAcknowledgeFailures" xml:space="preserve">
+    <value>Szinkronizációs hibák visszaigazolva</value>
+  </data>
+  <data name="Retention" xml:space="preserve">
+    <value>Megőrzés</value>
   </data>
   <data name="DeletionDisabledMessage" xml:space="preserve">
     <value>Az e-mailek törlése a konfiguráció által letiltva.</value>
@@ -3134,5 +3140,38 @@
   </data>
   <data name="Copy" xml:space="preserve">
     <value>Másolás</value>
+  </data>
+  <data name="MeetingInvitation" xml:space="preserve">
+    <value>Értekezlet-meghívás</value>
+  </data>
+  <data name="MeetingStart" xml:space="preserve">
+    <value>Kezdés</value>
+  </data>
+  <data name="MeetingEnd" xml:space="preserve">
+    <value>Befejezés</value>
+  </data>
+  <data name="MeetingLocation" xml:space="preserve">
+    <value>Helyszín</value>
+  </data>
+  <data name="MeetingOrganizer" xml:space="preserve">
+    <value>Szervező</value>
+  </data>
+  <data name="MeetingAttendees" xml:space="preserve">
+    <value>Résztvevők</value>
+  </data>
+  <data name="MeetingDescription" xml:space="preserve">
+    <value>Leírás</value>
+  </data>
+  <data name="AcknowledgeFailures" xml:space="preserve">
+    <value>Hibák elismerése</value>
+  </data>
+  <data name="AcknowledgeFailuresConfirm" xml:space="preserve">
+    <value>Ez előreviszi a szinkronizálási időbélyeget a feladat befejezési idejére, így a következő szinkronizálás normál növekményes szinkronizálás lesz. A sikertelen e-mailek nem lesznek újrapróbálva. Folytatja?</value>
+  </data>
+  <data name="AcknowledgeFailuresSuccess" xml:space="preserve">
+    <value>A szinkronizálási időbélyeg előre lett állítva. A következő szinkronizálás növekményes lesz.</value>
+  </data>
+  <data name="FailuresAcknowledged" xml:space="preserve">
+    <value>Hibák elismerve</value>
   </data>
 </root>
