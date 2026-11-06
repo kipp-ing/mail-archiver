@@ -19,15 +19,18 @@ namespace MailArchiver.Services.Providers.Graph
         private readonly MailArchiverDbContext _context;
         private readonly ILogger<GraphMailArchiver> _logger;
         private readonly DateTimeHelper _dateTimeHelper;
+        private readonly RawMessageOptions _rawMessageOptions;
 
         public GraphMailArchiver(
             MailArchiverDbContext context,
             ILogger<GraphMailArchiver> logger,
-            DateTimeHelper dateTimeHelper)
+            DateTimeHelper dateTimeHelper,
+            IOptions<RawMessageOptions>? rawMessageOptions = null)
         {
             _context = context;
             _logger = logger;
             _dateTimeHelper = dateTimeHelper;
+            _rawMessageOptions = rawMessageOptions?.Value ?? new RawMessageOptions();
         }
 
         /// <summary>
@@ -161,6 +164,12 @@ namespace MailArchiver.Services.Providers.Graph
                 // existing archives are still recognized as duplicates.
                 var messageIdCandidates = MailContentHelper.MessageIdMatchCandidates(messageId).ToList();
 
+                // Same range restriction on both sides as MailImporter applies: the incoming value
+                // was clamped inside ConvertToDisplayTimeZone, the column side is clamped here so
+                // that rows written before the clamp cannot overflow PostgreSQL's interval type.
+                var minSentDate = DateTimeHelper.MinimumPlausibleSentDate;
+                var maxSentDate = DateTimeHelper.MaximumPlausibleSentDate;
+
                 var existingInfo = await _context.ArchivedEmails
                     .AsNoTracking()
                     .Where(e => e.MailAccountId == accountId)
@@ -169,7 +178,9 @@ namespace MailArchiver.Services.Providers.Graph
                         (e.From == checkFrom &&
                          e.To == checkTo &&
                          e.Subject == checkSubject &&
-                         Math.Abs((e.SentDate - checkDate).TotalSeconds) < toleranceSeconds)
+                         Math.Abs(((e.SentDate < minSentDate ? minSentDate :
+                                     e.SentDate > maxSentDate ? maxSentDate : e.SentDate)
+                                   - checkDate).TotalSeconds) < toleranceSeconds)
                     )
                     .Select(e => new { e.Id, e.FolderName, e.Subject })
                     .FirstOrDefaultAsync();
@@ -331,6 +342,12 @@ namespace MailArchiver.Services.Providers.Graph
             await LoadAttachmentsAsync(graphClient, account.EmailAddress, message.Id, archivedEmail);
 
             archivedEmail.HasAttachments = archivedEmail.Attachments != null && archivedEmail.Attachments.Count > 0;
+
+            if (_rawMessageOptions.Enabled && _rawMessageOptions.IncludeGraph)
+            {
+                var rawMessage = await LoadRawMessageAsync(graphClient, account.EmailAddress, message.Id);
+                archivedEmail.RawMessage = RawMessageCodec.Create(rawMessage, _rawMessageOptions);
+            }
 
             // Outlook/M365 meeting invitations: Graph exposes the iCalendar payload as a
             // FileAttachment with ContentType "text/calendar" (or a .ics file name) but does
@@ -552,6 +569,34 @@ namespace MailArchiver.Services.Providers.Graph
         }
 
         /// <summary>
+        /// Loads the MIME content of a Graph message (GET /messages/{id}/$value). Returns null
+        /// on failure: the email is still archived, just without its original.
+        /// </summary>
+        private async Task<RawMessageCapture?> LoadRawMessageAsync(
+            GraphServiceClient graphClient,
+            string userPrincipalName,
+            string messageId)
+        {
+            try
+            {
+                await using var mimeStream = await graphClient.Users[userPrincipalName].Messages[messageId].Content.GetAsync();
+                if (mimeStream == null)
+                {
+                    return null;
+                }
+
+                using var buffered = new MemoryStream();
+                await mimeStream.CopyToAsync(buffered);
+                return new RawMessageCapture(buffered.ToArray(), RawMessageSource.Graph);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to load MIME content for Graph API message {MessageId}; archiving without original", messageId);
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Releases large payload references to mitigate Large Object Heap fragmentation.
         /// </summary>
         private static void ReleaseLargePayloads(ArchivedEmail archivedEmail)
@@ -568,6 +613,7 @@ namespace MailArchiver.Services.Providers.Graph
             archivedEmail.HtmlBody = null;
             archivedEmail.OriginalBodyText = null;
             archivedEmail.OriginalBodyHtml = null;
+            archivedEmail.RawMessage = null;
             archivedEmail.BodyUntruncatedText = null;
             archivedEmail.BodyUntruncatedHtml = null;
         }

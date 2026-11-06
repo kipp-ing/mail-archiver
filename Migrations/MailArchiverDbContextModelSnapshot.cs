@@ -303,6 +303,34 @@ namespace MailArchiver.Migrations
                     b.ToTable("EmailAttachments", "mail_archiver");
                 });
 
+            modelBuilder.Entity("MailArchiver.Models.RawMessage", b =>
+                {
+                    b.Property<int>("ArchivedEmailId")
+                        .HasColumnType("integer");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("varchar(16)");
+
+                    b.HasKey("ArchivedEmailId");
+
+                    b.ToTable("RawMessages", "mail_archiver");
+                });
+
             modelBuilder.Entity("MailArchiver.Models.AttachmentContent", b =>
                 {
                     b.Property<int>("Id")
@@ -582,6 +610,17 @@ namespace MailArchiver.Migrations
                     b.Navigation("AttachmentContent");
                 });
 
+            modelBuilder.Entity("MailArchiver.Models.RawMessage", b =>
+                {
+                    b.HasOne("MailArchiver.Models.ArchivedEmail", "ArchivedEmail")
+                        .WithOne("RawMessage")
+                        .HasForeignKey("MailArchiver.Models.RawMessage", "ArchivedEmailId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ArchivedEmail");
+                });
+
 
             modelBuilder.Entity("MailArchiver.Models.UserMailAccount", b =>
                 {
@@ -623,6 +662,8 @@ namespace MailArchiver.Migrations
             modelBuilder.Entity("MailArchiver.Models.ArchivedEmail", b =>
                 {
                     b.Navigation("Attachments");
+
+                    b.Navigation("RawMessage");
                 });
 
             modelBuilder.Entity("MailArchiver.Models.AttachmentContent", b =>
@@ -877,6 +918,96 @@ namespace MailArchiver.Migrations
                         .HasForeignKey("MailArchiver.Models.AccountStorageBackfillState", "MailAccountId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("MailAccount");
+                });
+            modelBuilder.Entity("MailArchiver.Models.MailcowInstance", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ApiKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ApiUrl")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ImapHost")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("ImapPort")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApiUrl")
+                        .IsUnique();
+
+                    b.ToTable("MailcowInstances", "mail_archiver");
+                });
+
+            modelBuilder.Entity("MailArchiver.Models.MailcowMailbox", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AppName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("AppPasswordId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EmailAddress")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("InstanceId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsRevoked")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("MailAccountId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MailAccountId");
+
+                    b.HasIndex("InstanceId", "EmailAddress")
+                        .IsUnique();
+
+                    b.ToTable("MailcowMailboxes", "mail_archiver");
+                });
+
+            modelBuilder.Entity("MailArchiver.Models.MailcowMailbox", b =>
+                {
+                    b.HasOne("MailArchiver.Models.MailcowInstance", "Instance")
+                        .WithMany()
+                        .HasForeignKey("InstanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MailAccount", "MailAccount")
+                        .WithMany()
+                        .HasForeignKey("MailAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Instance");
 
                     b.Navigation("MailAccount");
                 });
