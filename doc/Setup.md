@@ -69,8 +69,12 @@ services:
 
       # Original Message Storage (complete .eml per email, disabled by default)
       - RawMessages__Enabled=false
+      - RawMessages__Storage=postgres
       - RawMessages__MaxMessageSizeMb=50
       - RawMessages__IncludeGraph=true
+      - RawMessages__FileSystem__BasePath=RawMessages
+      - RawMessages__FileSystem__ShardDepth=2
+      - RawMessages__FileSystem__VerifyChecksumOnRead=true
 
       # BatchRestore Settings
       - BatchRestore__AsyncThreshold=50
@@ -186,6 +190,9 @@ services:
       # (also configure LocalImport__AllowedPaths__0=/data/import in environment variables)
       # - /path/to/your/mbox/files:/data/import
       - ./data-protection-keys:/app/DataProtection-Keys
+      # Only with RawMessages__Storage=filesystem: keep the original messages outside the
+      # container, otherwise they are lost when the container is recreated.
+      # - ./raw-messages:/app/RawMessages
     depends_on:
       postgres:
         condition: service_healthy
@@ -305,10 +312,48 @@ The optional MCP (Model Context Protocol) server exposes the same read-only mail
 - `MailSync__ExcludeSubfolders`: Whether an exclusion entry also covers the folders below the one it names. Applies to the per-account list and the installation-wide one alike, and to both providers. Default `false`, matching the behaviour before the option existed: an entry `Deleted Items` matches only that folder, and a tree is kept out of the archive by naming its root and every folder below it. Set to `true` to have an entry take the tree underneath as well — an entry `Deleted Items` then also keeps `Deleted Items/2024` and the rest of that branch out of the archive. The rule anchors on the path separator, so it takes whole folders and never part of a name: `Archive` covers `Archive` and `Archive/Team`, and leaves a mail folder called `Team Archive Review` alone. A `.` counts as a separator too, the same way the path-suffix rule treats it.
 
 ### 📧 Original Message Storage Settings
-By default the archive keeps the parsed parts of an email (headers, bodies, attachments), and an exported `.eml` is rebuilt from them. That is enough to read the headers, but it is not the message as received: transfer encodings, MIME boundaries and header folding differ, so DKIM signatures no longer verify and spam scanners score it differently. With this setting the original message is stored as well, and the API returns it from `GET /api/v1/emails/{id}/raw` (see the [REST API guide](API.md#download-original-message)).
+By default the archive keeps the parsed parts of an email (headers, bodies, attachments), and an exported `.eml` is rebuilt from them. That is enough to read the headers, but it is not the message as received: transfer encodings, MIME boundaries and header folding differ, so DKIM signatures no longer verify and spam scanners score it differently. With this setting the original message is stored as well. The API returns it from `GET /api/v1/emails/{id}/raw` (see the [REST API guide](API.md#download-original-message)), and the **Export EML** button on the email's detail page serves the stored original when one exists, falling back to the reconstruction for emails that were archived without one.
 - `RawMessages__Enabled`: Store the original message of every newly archived email (default `false`). Emails archived before switching it on have no original. Storage grows by roughly the size of the mail including attachments (gzip-compressed, attachments are not deduplicated inside it), so plan for about twice the database size per email.
 - `RawMessages__MaxMessageSizeMb`: Messages larger than this are archived without their original (default `50`, `0` = no limit).
 - `RawMessages__IncludeGraph`: Also store the original for Microsoft 365 (Graph) accounts (default `true`). Costs one additional Graph request per message, which counts against the Graph throttling budget.
+- `RawMessages__Storage`: Where the message bytes are kept - `postgres` (default, in the database) or `filesystem` (a gzip file next to the archive). The metadata row with the SHA-256, size and capture source stays in the database either way, so every stored original can still be verified against it. See [Storage Backend](#storage-backend) below.
+- `RawMessages__FileSystem__BasePath`: Directory the message files are written to (default `RawMessages`, relative to the application's content root). Point this at a mounted volume in Docker.
+- `RawMessages__FileSystem__ShardDepth`: Number of two-character directory levels the email id is spread over (default `2`, giving 10,000 directories; `0` = flat). Keeps the per-directory file count low on large archives.
+- `RawMessages__FileSystem__VerifyChecksumOnRead`: Re-compute the SHA-256 of the file on every download and compare it with the checksum recorded at archive time (default `true`). A mismatch makes the download fail with HTTP 500 instead of serving altered bytes.
+
+The download reports which form it served: `X-Raw-Message-Source` names the capture source and `X-Raw-Message-Sha256` the checksum of the stored original, while a rebuilt message carries `X-Raw-Message-Reconstructed: true` and no checksum. The filename says it too, `email-{id}-original-...eml` against `email-{id}-...eml`. When a stored original fails its checksum the export is refused with an error message instead of silently returning the reconstruction, because the reconstruction would hide that the archived copy was altered.
+
+#### Storage Backend
+
+With `RawMessages__Storage=filesystem` the original messages no longer grow the database; they are written to `{BasePath}/{xx}/{yy}/{id}.eml.gz`, where `xx`/`yy` are derived from the email id. The `mail_archiver."RawMessages"` row keeps the checksum, size, capture source and the relative path, so the archive can still prove what a stored message should contain.
+
+!!! danger "Mount a volume in Docker"
+    The default `BasePath` (`RawMessages`) resolves to `/app/RawMessages` **inside the container**. Without a bind mount that directory belongs to the container's writable layer, so every recreated container - including `docker compose down && docker compose up -d`, an image update, or a host reboot with an ephemeral layer - takes every stored original with it while the database rows survive.
+
+    Always mount the directory to the host when using the filesystem backend:
+
+    ```yaml
+    services:
+      mailarchive-app:
+        volumes:
+          - ./raw-messages:/app/RawMessages
+    ```
+
+    The host path (`./raw-messages` here) is what you back up; the container path must match `RawMessages__FileSystem__BasePath` (or set `RawMessages__FileSystem__BasePath=/data/raw-messages` and mount to `/data/raw-messages` instead). If you move the mount, keep `BasePath` pointing at it - the stored `StoragePath` values are relative, so they keep resolving.
+
+Reads follow the storage recorded on each row, not the configured setting: after switching the backend, messages archived earlier stay downloadable from where they are. Changing the setting only affects newly archived mail. To move existing messages, run the storage migration:
+
+```bash
+# move everything from the database to the filesystem
+docker compose exec mailarchiver dotnet MailArchiver.dll --migrate-raw-storage --from postgres --to filesystem
+
+# and back again
+docker compose exec mailarchiver dotnet MailArchiver.dll --migrate-raw-storage --from filesystem --to postgres
+```
+
+Options are `--from`, `--to` (both default to the configured backend) and `--batch` (messages per transaction, default `200`). The migration reads each message through its current backend, verifies it against the recorded checksum, writes it to the target and only then removes the source. A message whose content does not match its checksum is left untouched and reported - neither a corrupt original nor its only remaining copy is ever discarded. The run is resumable: it selects work by the `StorageType` column, so an interrupted migration continues where it stopped when started again. The exit code is non-zero if any message failed.
+
+Because the file now lives outside the database, back up the `BasePath` directory together with the database dump. A database restore without the files leaves the archive with rows whose content cannot be served; the download then answers HTTP 404 rather than returning something wrong.
 
 The MCP server returns it from the `get_email_raw` tool (see the [MCP guide](MCP.md#get_email_raw)). How the original is obtained depends on where the mail comes from; the API reports it in the `X-Raw-Message-Source` header, MCP in the `source` field:
 
@@ -404,7 +449,7 @@ Both folder settings ship empty on purpose: rewriting or dropping folders withou
   - When using `docker exec` to run the import command, the file path provided via `--file` must be within one of these allowed paths.
   - This security measure prevents arbitrary file system access from CLI commands.
   - Multiple paths can be configured for different import sources.
-  - See [CLI Local Import Guide](CLI-Local-Import.md) for detailed usage instructions.
+  - See [CLI commands](CLI.md) for detailed usage instructions.
 
 ### 📄 CSV Import Settings
 - `CsvImport__MaxRows`: Maximum number of CSV rows (mailboxes) processed in a single bulk import. Default is `5000`. Increase this value for large deployments; lower it to limit the impact of a single import run on database load.
@@ -502,6 +547,7 @@ For detailed setup instructions for OpenID Connect authentication, see [OIDC Imp
 - `OAuth__ClientScopes__0`: First scope requested from the identity provider (openid)
 - `OAuth__ClientScopes__1`: Second scope requested from the identity provider (profile)
 - `OAuth__ClientScopes__2`: Third scope requested from the identity provider (email)
+- `OAuth__ResponseMode`: Optional response mode of the authorization request (`query`, `fragment` or `form_post`). Default is `form_post`, the ASP.NET Core default. Set to `query` for providers that do not support `form_post`, such as Synology SSO Server. See [Provider Compatibility](OIDC_Implementation.md#provider-compatibility).
 - `OAuth__AutoApproveUsers`: Automatically approve new OIDC users without requiring manual admin approval (true/false). Default is `false`.
 
 #### User Provisioning Settings
@@ -509,7 +555,7 @@ For detailed setup instructions for OpenID Connect authentication, see [OIDC Imp
 - `OAuth__AdminEmails__0`, `OAuth__AdminEmails__1`, etc.: Email addresses that should be automatically provisioned as administrators. Users with these email addresses will be created as active admins on first OAuth login, bypassing the normal approval process. Email matching is case-insensitive.
 
 #### Passwordless Login Settings
-- `OAuth__DisablePasswordLogin`: Hide username/password fields on login page (true/false). Default is `false`. When enabled, only the OAuth login button is displayed.
+- `OAuth__DisablePasswordLogin`: Disable username/password login (true/false). Default is `false`. When enabled, the password form is hidden **and** the server rejects every password POST, so only the OAuth login is available. Requires `OAuth__Enabled=true`. If OAuth is disabled, this setting has no effect.
 - `OAuth__AutoRedirect`: Automatically redirect users to OAuth provider (true/false). Default is `false`. Requires `OAuth__DisablePasswordLogin` to be `true`. Users will see a brief loading screen before being redirected.
 
 #### Example: Full OIDC-First Configuration

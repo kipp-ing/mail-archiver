@@ -27,6 +27,7 @@ namespace MailArchiver.Services.Core
         private readonly DashboardOptions _dashboardOptions;
         private readonly IMemoryCache _memoryCache;
         private readonly RawMessageOptions _rawMessageOptions;
+        private readonly IRawMessageStore? _rawMessageStore;
 
         public EmailCoreService(
             MailArchiverDbContext context,
@@ -35,7 +36,8 @@ namespace MailArchiver.Services.Core
             IOptions<BatchOperationOptions> batchOptions,
             IOptions<DashboardOptions>? dashboardOptions = null,
             IMemoryCache? memoryCache = null,
-            IOptions<RawMessageOptions>? rawMessageOptions = null)
+            IOptions<RawMessageOptions>? rawMessageOptions = null,
+            IRawMessageStore? rawMessageStore = null)
         {
             _context = context;
             _logger = logger;
@@ -44,6 +46,11 @@ namespace MailArchiver.Services.Core
             _dashboardOptions = dashboardOptions?.Value ?? new DashboardOptions();
             _memoryCache = memoryCache ?? new MemoryCache(new Microsoft.Extensions.Caching.Memory.MemoryCacheOptions());
             _rawMessageOptions = rawMessageOptions?.Value ?? new RawMessageOptions();
+
+            // Tests and the CLI construct this service without a store; fall back to the
+            // Postgres backend, which is what the archive did before storage was pluggable.
+            _rawMessageStore = rawMessageStore ?? new PostgresRawMessageStore(
+                context, Options.Create(_rawMessageOptions));
         }
 
         /// <summary>Whether callers should capture the original message bytes for ArchiveEmailAsync.</summary>
@@ -759,6 +766,16 @@ namespace MailArchiver.Services.Core
         #region Export Methods
 
         public async Task<byte[]> ExportEmailsAsync(ExportViewModel parameters, List<int> allowedAccountIds = null)
+            => (await ExportEmailAsync(parameters, allowedAccountIds)).Bytes;
+
+        /// <summary>
+        /// Exports a single email and reports whether the bytes are the stored original or a
+        /// reconstruction. A stored original is preferred when one exists: it is the only form
+        /// that is byte-identical to what was received. A message whose stored content fails its
+        /// checksum throws <see cref="RawMessageIntegrityException"/> instead of falling back to
+        /// the reconstruction, so altered content is never silently replaced by a rebuilt one.
+        /// </summary>
+        public async Task<EmailExportResult> ExportEmailAsync(ExportViewModel parameters, List<int> allowedAccountIds = null)
         {
             using var ms = new MemoryStream();
 
@@ -775,11 +792,25 @@ namespace MailArchiver.Services.Core
                     throw new InvalidOperationException($"Email with ID {parameters.EmailId.Value} not found");
                 }
 
+                if (parameters.Format == ExportFormat.Eml)
+                {
+                    var original = await _rawMessageStore.ReadAsync(email.Id);
+                    if (original != null)
+                    {
+                        _logger.LogInformation(
+                            "Exporting email {EmailId} as its stored original (source {Source}, storage {Storage})",
+                            email.Id, original.Source, original.StorageType);
+
+                        return new EmailExportResult(
+                            original.Bytes, true, original.Source, original.Sha256, original.StorageType);
+                    }
+                }
+
                 await ExportSingleEmailAsEml(email, ms);
             }
 
             ms.Position = 0;
-            return ms.ToArray();
+            return new EmailExportResult(ms.ToArray(), false);
         }
 
         private async Task ExportSingleEmailAsEml(ArchivedEmail email, MemoryStream ms)
@@ -2210,12 +2241,22 @@ namespace MailArchiver.Services.Core
                     archivedEmail.HasAttachments = true;
                 }
 
-                archivedEmail.RawMessage = RawMessageCodec.Create(rawMessage, _rawMessageOptions);
+                archivedEmail.RawMessage = null;
 
                 try
                 {
                     _context.ArchivedEmails.Add(archivedEmail);
                     await _context.SaveChangesAsync();
+
+                    // The row is in place, so the id exists; a filesystem-backed original is
+                    // written now and its metadata row added in a second save.
+                    var storedRaw = _rawMessageStore.CreateRow(archivedEmail.Id, rawMessage);
+                    if (storedRaw != null)
+                    {
+                        archivedEmail.RawMessage = storedRaw;
+                        await _rawMessageStore.PersistAsync(storedRaw, rawMessage);
+                        await _context.SaveChangesAsync();
+                    }
 
                     // Attachments are already saved via EF relationship (cascade)
                     _logger.LogInformation("Successfully saved email with {Count} attachments", emailAttachments.Count);
