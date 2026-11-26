@@ -145,6 +145,12 @@
   <data name="PageOf" xml:space="preserve">
     <value>Stran {0} od {1}</value>
   </data>
+  <data name="GoToPage" xml:space="preserve">
+    <value>Pojdi na stran</value>
+  </data>
+  <data name="Go" xml:space="preserve">
+    <value>Pojdi</value>
+  </data>
   <data name="SelectAll" xml:space="preserve">
     <value>Izberi vse</value>
   </data>
@@ -739,9 +745,6 @@
   <data name="DangerZoneInfo" xml:space="preserve">
     <value>Naslednja dejanja so nepovratna in trajno izbrišejo podatke.</value>
   </data>
-  <data name="DeleteAccountAllEmailsButton" xml:space="preserve">
-    <value>Izbriši račun in vso pošto ({0})</value>
-  </data>
   <data name="DeleteAccountWithEmailsConfirm" xml:space="preserve">
     <value>Res želite izbrisati ta račun in VSO ({0}) arhivirano e-pošto? Dejanja ni mogoče razveljaviti!</value>
   </data>
@@ -1239,9 +1242,6 @@
   </data>
   <data name="ChangePassword" xml:space="preserve">
     <value>Zamenjaj geslo</value>
-  </data>
-  <data name="Sign Out" xml:space="preserve">
-    <value>Odjava</value>
   </data>
   <data name="PasswordHint" xml:space="preserve">
     <value>Geslo mora imeti vsaj 6 znakov.</value>
@@ -2065,6 +2065,9 @@
   <data name="MaxSelectionsReached" xml:space="preserve">
     <value>Doseženo največje število izbir ({0})</value>
   </data>
+  <data name="SelectAllMatching" xml:space="preserve">
+    <value>Izberi vse zadetke ({0})</value>
+  </data>
   <data name="SelectAllOnPage" xml:space="preserve">
     <value>Izberi vse na strani</value>
   </data>
@@ -2365,6 +2368,12 @@
   <data name="OidcClaimLengthExceeded" xml:space="preserve">
     <value>Vrednosti zahtevka prečkajo maksimalno dovoljeno dolžino</value>
   </data>
+  <data name="OidcMissingClaim" xml:space="preserve">
+    <value>Ponudnik identitete ni vrnil zahtevane trditve ({0}). Obrnite se na skrbnika.</value>
+  </data>
+  <data name="OidcLoginFailed" xml:space="preserve">
+    <value>Prijava z enotno prijavo ni uspela. Poskusite znova ali se obrnite na skrbnika.</value>
+  </data>
   <data name="OidcInvalidEmailFormat" xml:space="preserve">
     <value>Neveljaven format e-pošte, prejet od ponudnika identitete</value>
   </data>
@@ -2652,6 +2661,15 @@
   </data>
   <data name="GotIt" xml:space="preserve">
     <value>Razumem!</value>
+  </data>
+  <data name="UpdateAvailableTitle" xml:space="preserve">
+    <value>Na voljo je posodobitev</value>
+  </data>
+  <data name="UpdateAvailableBody" xml:space="preserve">
+    <value>Različica {0} je na voljo na GitHubu.</value>
+  </data>
+  <data name="ViewRelease" xml:space="preserve">
+    <value>Poglej izdajo</value>
   </data>
 
   <!-- MSA (personal Microsoft account) OAuth2 device code flow -->
@@ -3608,7 +3626,271 @@
   <data name="MailcowNewImapPasswordRequired" xml:space="preserve"><value>Po zapustitvi Mailcow vnesite novo geslo IMAP.</value></data>
   <data name="MailcowLinkSuccess" xml:space="preserve"><value>Račun je povezan s primerkom Mailcow {0}.</value></data>
   <data name="MailcowDetachSuccess" xml:space="preserve"><value>Dostop do Mailcow je preklican. Vnesite nove poverilnice za izbranega ponudnika.</value></data>
+  <data name="DeleteAllMatches" xml:space="preserve">
+    <value>Izbriši vse zadetke</value>
+  </data>
+  <data name="DeleteAllMatchesTitle" xml:space="preserve">
+    <value>Izbriši vsa ustrezna e-poštna sporočila</value>
+  </data>
+  <data name="DeleteAllMatchesWarning" xml:space="preserve">
+    <value>To trajno izbriše {0} e-poštnih sporočil, ki ustrezajo trenutnemu filtru. Tega ni mogoče razveljaviti; vsak izbris se zabeleži.</value>
+  </data>
+  <data name="DeleteAllMatchesLockedInfo" xml:space="preserve">
+    <value>{0} ustreznih sporočil je zaklenjenih s pravilnikom o hrambi in bodo ohranjena.</value>
+  </data>
+  <data name="DeleteAllMatchesConfirmLabel" xml:space="preserve">
+    <value>Za potrditev vnesite število e-poštnih sporočil</value>
+  </data>
+  <data name="DeleteAllMatchesCountChanged" xml:space="preserve">
+    <value>Nabor rezultatov se je spremenil (potrjeno: {0}, trenutno: {1}). Preverite filter in znova potrdite.</value>
+  </data>
+  <data name="DeleteAllMatchesNoMatches" xml:space="preserve">
+    <value>Nobeno sporočilo, ki ga je mogoče izbrisati, ne ustreza temu filtru.</value>
+  </data>
+  <data name="DeleteAllMatchesNoMatchesLocked" xml:space="preserve">
+    <value>Nobeno sporočilo, ki ga je mogoče izbrisati, ne ustreza temu filtru; {0} ustreznih sporočil je zaklenjenih s pravilnikom o hrambi.</value>
+  </data>
+  <data name="DeleteAllMatchesFilterRequired" xml:space="preserve">
+    <value>Najprej zožite nabor rezultatov (iskalni niz, datum, mapa ali račun).</value>
+  </data>
+  <data name="DeleteAllMatchesCapExceeded" xml:space="preserve">
+    <value>{0} zadetkov presega nastavljeno največjo vrednost {1}. Zožite filter.</value>
+  </data>
+  <data name="DeleteAllMatchesQueued" xml:space="preserve">
+    <value>Opravilo brisanja se je začelo za {0} sporočil. ID opravila: {1}</value>
+  </data>
+  <data name="DeleteAllMatchesPreviewFailed" xml:space="preserve">
+    <value>Števila ustreznih sporočil ni bilo mogoče določiti. Poskusite znova.</value>
+  </data>
+  <data name="SkippedLockedEmails" xml:space="preserve">
+    <value>Preskočeno (zaklenjeno)</value>
+  </data>
+  <data name="FilterJob" xml:space="preserve">
+    <value>Filter</value>
+  </data>
   <data name="PasswordLoginDisabledError" xml:space="preserve">
     <value>Prijava z geslom je onemogočena. Prijavite se prek svojega ponudnika identitete.</value>
+  </data>
+  <data name="ConfirmCancelDeletion" xml:space="preserve">
+    <value>Preklicati brisanje?</value>
+  </data>
+  <data name="DeleteItemUserConfig" xml:space="preserve">
+    <value>Uporabniška konfiguracija in nastavitve</value>
+  </data>
+  <data name="ExportDownloadError" xml:space="preserve">
+    <value>Izvoza ni bilo mogoče prenesti. Poskusite znova.</value>
+  </data>
+  <data name="Format" xml:space="preserve">
+    <value>Format</value>
+  </data>
+  <data name="ImportFromTenant" xml:space="preserve">
+    <value>Uvozi celotnega najemnika</value>
+  </data>
+  <data name="Of" xml:space="preserve">
+    <value>od</value>
+  </data>
+  <data name="SelectAccountFirst" xml:space="preserve">
+    <value>Najprej izberite račun</value>
+  </data>
+  <data name="SelectFolder" xml:space="preserve">
+    <value>Izberi mapo</value>
+  </data>
+  <data name="OriginalMissing" xml:space="preserve">
+    <value>Original manjka</value>
+  </data>
+  <data name="OriginalMissingHint" xml:space="preserve">
+    <value>Za to e-poštno sporočilo izvirnik ni shranjen. Arhiv lahko ponudi le rekonstrukcijo.</value>
+  </data>
+  <data name="InvoicePdf.Invoice" xml:space="preserve">
+    <value>Račun</value>
+  </data>
+  <data name="InvoicePdf.CreditNote" xml:space="preserve">
+    <value>Dobropis</value>
+  </data>
+  <data name="InvoicePdf.InvoiceNumber" xml:space="preserve">
+    <value>Številka računa</value>
+  </data>
+  <data name="InvoicePdf.InvoiceDate" xml:space="preserve">
+    <value>Datum računa</value>
+  </data>
+  <data name="InvoicePdf.DueShort" xml:space="preserve">
+    <value>Zapadlost</value>
+  </data>
+  <data name="InvoicePdf.Seller" xml:space="preserve">
+    <value>Prodajalec</value>
+  </data>
+  <data name="InvoicePdf.Buyer" xml:space="preserve">
+    <value>Kupec</value>
+  </data>
+  <data name="InvoicePdf.PayeeDifferent" xml:space="preserve">
+    <value>Prejemnik (drug)</value>
+  </data>
+  <data name="InvoicePdf.ShipTo" xml:space="preserve">
+    <value>Naslov dostave</value>
+  </data>
+  <data name="InvoicePdf.TaxRepresentative" xml:space="preserve">
+    <value>Davčni zastopnik</value>
+  </data>
+  <data name="InvoicePdf.Contact" xml:space="preserve">
+    <value>Kontakt</value>
+  </data>
+  <data name="InvoicePdf.VatId" xml:space="preserve">
+    <value>ID za DDV</value>
+  </data>
+  <data name="InvoicePdf.TaxNumber" xml:space="preserve">
+    <value>Davčna številka</value>
+  </data>
+  <data name="InvoicePdf.Register" xml:space="preserve">
+    <value>Register</value>
+  </data>
+  <data name="InvoicePdf.Details" xml:space="preserve">
+    <value>Podatki o računu</value>
+  </data>
+  <data name="InvoicePdf.BuyerReference" xml:space="preserve">
+    <value>Referenca kupca</value>
+  </data>
+  <data name="InvoicePdf.Currency" xml:space="preserve">
+    <value>Valuta</value>
+  </data>
+  <data name="InvoicePdf.DueDate" xml:space="preserve">
+    <value>Datum zapadlosti</value>
+  </data>
+  <data name="InvoicePdf.DeliveryDate" xml:space="preserve">
+    <value>Datum dobave</value>
+  </data>
+  <data name="InvoicePdf.BillingPeriod" xml:space="preserve">
+    <value>Obračunsko obdobje</value>
+  </data>
+  <data name="InvoicePdf.BuyerOrder" xml:space="preserve">
+    <value>Referenca naročila kupca</value>
+  </data>
+  <data name="InvoicePdf.SalesOrder" xml:space="preserve">
+    <value>Referenca naročila prodajalca</value>
+  </data>
+  <data name="InvoicePdf.Contract" xml:space="preserve">
+    <value>Referenca pogodbe</value>
+  </data>
+  <data name="InvoicePdf.Project" xml:space="preserve">
+    <value>Referenca projekta</value>
+  </data>
+  <data name="InvoicePdf.DespatchAdvice" xml:space="preserve">
+    <value>Dobavnica</value>
+  </data>
+  <data name="InvoicePdf.BuyerAccount" xml:space="preserve">
+    <value>Knjigovodska referenca kupca</value>
+  </data>
+  <data name="InvoicePdf.SellerVatId" xml:space="preserve">
+    <value>ID za DDV prodajalca</value>
+  </data>
+  <data name="InvoicePdf.BuyerVatId" xml:space="preserve">
+    <value>ID za DDV kupca</value>
+  </data>
+  <data name="InvoicePdf.Lines" xml:space="preserve">
+    <value>Postavke računa</value>
+  </data>
+  <data name="InvoicePdf.Description" xml:space="preserve">
+    <value>Opis</value>
+  </data>
+  <data name="InvoicePdf.Quantity" xml:space="preserve">
+    <value>Količina</value>
+  </data>
+  <data name="InvoicePdf.Unit" xml:space="preserve">
+    <value>Enota</value>
+  </data>
+  <data name="InvoicePdf.UnitPrice" xml:space="preserve">
+    <value>Cena na enoto</value>
+  </data>
+  <data name="InvoicePdf.TaxRate" xml:space="preserve">
+    <value>DDV</value>
+  </data>
+  <data name="InvoicePdf.Amount" xml:space="preserve">
+    <value>Znesek</value>
+  </data>
+  <data name="InvoicePdf.NoLines" xml:space="preserve">
+    <value>Postavke računa niso bile poslane.</value>
+  </data>
+  <data name="InvoicePdf.AllowancesCharges" xml:space="preserve">
+    <value>Popusti in pribitki</value>
+  </data>
+  <data name="InvoicePdf.Allowance" xml:space="preserve">
+    <value>Popust</value>
+  </data>
+  <data name="InvoicePdf.Charge" xml:space="preserve">
+    <value>Pribitek</value>
+  </data>
+  <data name="InvoicePdf.SumLines" xml:space="preserve">
+    <value>Vsota postavk (neto)</value>
+  </data>
+  <data name="InvoicePdf.Charges" xml:space="preserve">
+    <value>Pribitki</value>
+  </data>
+  <data name="InvoicePdf.Allowances" xml:space="preserve">
+    <value>Popusti</value>
+  </data>
+  <data name="InvoicePdf.TaxBasis" xml:space="preserve">
+    <value>Davčna osnova</value>
+  </data>
+  <data name="InvoicePdf.GrandTotal" xml:space="preserve">
+    <value>Skupaj račun (bruto)</value>
+  </data>
+  <data name="InvoicePdf.Prepaid" xml:space="preserve">
+    <value>Že plačano</value>
+  </data>
+  <data name="InvoicePdf.Rounding" xml:space="preserve">
+    <value>Zaokroževanje</value>
+  </data>
+  <data name="InvoicePdf.Payable" xml:space="preserve">
+    <value>Znesek za plačilo</value>
+  </data>
+  <data name="InvoicePdf.PaymentMeans" xml:space="preserve">
+    <value>Način plačila</value>
+  </data>
+  <data name="InvoicePdf.Iban" xml:space="preserve">
+    <value>IBAN</value>
+  </data>
+  <data name="InvoicePdf.Bic" xml:space="preserve">
+    <value>BIC</value>
+  </data>
+  <data name="InvoicePdf.AccountHolder" xml:space="preserve">
+    <value>Imetnik računa</value>
+  </data>
+  <data name="InvoicePdf.PaymentReference" xml:space="preserve">
+    <value>Referenca plačila</value>
+  </data>
+  <data name="InvoicePdf.MandateReference" xml:space="preserve">
+    <value>Referenca mandata</value>
+  </data>
+  <data name="InvoicePdf.PaymentTerms" xml:space="preserve">
+    <value>Plačilni pogoji</value>
+  </data>
+  <data name="InvoicePdf.PaymentInfo" xml:space="preserve">
+    <value>Podatki o plačilu</value>
+  </data>
+  <data name="InvoicePdf.Notes" xml:space="preserve">
+    <value>Opombe</value>
+  </data>
+  <data name="InvoicePdf.PageOf" xml:space="preserve">
+    <value>Stran {0} od {1}</value>
+  </data>
+  <data name="InvoicePdf.MoreLines" xml:space="preserve">
+    <value>Še {0} postavk je samo v XML.</value>
+  </data>
+  <data name="InvoicePdf.Disclaimer" xml:space="preserve">
+    <value>Interni pogled, ni pravno zavezujoč izvirnik. Zavezujoča je poslana datoteka XML.</value>
+  </data>
+  <data name="InvoicePdf.NotStated" xml:space="preserve">
+    <value>ni navedeno</value>
+  </data>
+  <data name="XRechnung" xml:space="preserve">
+    <value>XRechnung</value>
+  </data>
+  <data name="DownloadPdf" xml:space="preserve">
+    <value>Prenesi PDF</value>
+  </data>
+  <data name="DownloadOriginalXml" xml:space="preserve">
+    <value>Prenesi izvirni XML</value>
+  </data>
+  <data name="InvoicePreviewNotice" xml:space="preserve">
+    <value>Interni pogled PDF, ni pravno zavezujoč izvirnik. Zavezujoča je poslana datoteka XML.</value>
   </data>
 </root>

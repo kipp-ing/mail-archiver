@@ -147,5 +147,86 @@ namespace MailArchiver.Services.Shared
         private string ResolvePath(RawMessage row)
             => _paths.GetAbsolutePath(
                 string.IsNullOrEmpty(row.StoragePath) ? _paths.GetRelativePath(row.ArchivedEmailId) : row.StoragePath);
+
+        /// <summary>
+        /// Deletes the message files of emails whose rows are already gone. The row is used when
+        /// it still exists, otherwise the path is derived from the email id - which is exactly
+        /// what <see cref="CreateRow"/> produced, so it finds every file this installation wrote.
+        /// A file that cannot be removed is logged and left to the orphan collector.
+        /// <para>
+        /// Emails that still exist are skipped. That is what makes the call safe to place after
+        /// a deletion that may have failed or rolled back: an original is never removed while
+        /// its email is still in the archive.
+        /// </para>
+        /// </summary>
+        public async Task DeleteAsync(IReadOnlyCollection<int> emailIds, CancellationToken cancellationToken = default)
+        {
+            if (emailIds.Count == 0)
+            {
+                return;
+            }
+
+            var ids = emailIds.ToList();
+
+            // Only emails that are really gone; a failed or rolled-back deletion leaves its
+            // email in place, and its original must survive with it.
+            var stillPresent = await _context.ArchivedEmails
+                .AsNoTracking()
+                .Where(e => ids.Contains(e.Id))
+                .Select(e => e.Id)
+                .ToListAsync(cancellationToken);
+
+            if (stillPresent.Count > 0)
+            {
+                ids = ids.Except(stillPresent).ToList();
+            }
+
+            if (ids.Count == 0)
+            {
+                return;
+            }
+
+            // A row that still exists wins over the derived path, because a migrated row can
+            // carry a path that differs from the one the current shard depth produces. In the
+            // normal delete flow the row is already gone: RawMessages cascades with
+            // ArchivedEmails. This lookup therefore only helps for an orphaned metadata row,
+            // and the derived path covers every file this installation wrote.
+            var recorded = await _context.RawMessages
+                .AsNoTracking()
+                .Where(r => ids.Contains(r.ArchivedEmailId) && r.StorageType == RawMessageStorage.FileSystem)
+                .Select(r => new { r.ArchivedEmailId, r.StoragePath })
+                .ToListAsync(cancellationToken);
+
+            var paths = new Dictionary<int, string>();
+            foreach (var row in recorded)
+            {
+                paths[row.ArchivedEmailId] = _paths.GetAbsolutePath(
+                    string.IsNullOrEmpty(row.StoragePath)
+                        ? _paths.GetRelativePath(row.ArchivedEmailId)
+                        : row.StoragePath);
+            }
+
+            foreach (var id in ids)
+            {
+                if (!paths.TryGetValue(id, out var absolute))
+                {
+                    absolute = _paths.GetAbsolutePath(_paths.GetRelativePath(id));
+                }
+
+                try
+                {
+                    if (File.Exists(absolute))
+                    {
+                        File.Delete(absolute);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    _logger.LogWarning(ex,
+                        "Could not delete the original message file of email {EmailId} at {Path}; " +
+                        "the orphan cleanup will retry", id, absolute);
+                }
+            }
+        }
     }
 }

@@ -145,6 +145,12 @@
   <data name="PageOf" xml:space="preserve">
     <value>Pagina {0} di {1}</value>
   </data>
+  <data name="GoToPage" xml:space="preserve">
+    <value>Vai alla pagina</value>
+  </data>
+  <data name="Go" xml:space="preserve">
+    <value>Vai</value>
+  </data>
   <data name="SelectAll" xml:space="preserve">
     <value>Seleziona tutto</value>
   </data>
@@ -739,9 +745,6 @@
   <data name="DangerZoneInfo" xml:space="preserve">
     <value>Le seguenti azioni sono irreversibili ed elimineranno definitivamente i dati.</value>
   </data>
-  <data name="DeleteAccountAllEmailsButton" xml:space="preserve">
-    <value>Elimina account e tutte le email ({0})</value>
-  </data>
   <data name="DeleteAccountWithEmailsConfirm" xml:space="preserve">
     <value>Sei sicuro di voler eliminare questo account e TUTTE le {0} email archiviate? Questa azione non può essere annullata!</value>
   </data>
@@ -1239,9 +1242,6 @@
   </data>
   <data name="ChangePassword" xml:space="preserve">
     <value>Cambia password</value>
-  </data>
-  <data name="Sign Out" xml:space="preserve">
-    <value>Disconnetti</value>
   </data>
   <data name="PasswordHint" xml:space="preserve">
     <value>La password deve essere di almeno 6 caratteri.</value>
@@ -2065,6 +2065,9 @@
   <data name="MaxSelectionsReached" xml:space="preserve">
     <value>Massimo selezioni raggiunto ({0})</value>
   </data>
+  <data name="SelectAllMatching" xml:space="preserve">
+    <value>Seleziona tutti i {0} risultati</value>
+  </data>
   <data name="SelectAllOnPage" xml:space="preserve">
     <value>Seleziona tutto nella pagina</value>
   </data>
@@ -2365,6 +2368,12 @@
   <data name="OidcClaimLengthExceeded" xml:space="preserve">
     <value>I valori della richiesta superano la lunghezza massima consentita</value>
   </data>
+  <data name="OidcMissingClaim" xml:space="preserve">
+    <value>Il tuo provider di identità non ha restituito un'attestazione obbligatoria ({0}). Contatta il tuo amministratore.</value>
+  </data>
+  <data name="OidcLoginFailed" xml:space="preserve">
+    <value>Accesso tramite single sign-on non riuscito. Riprova o contatta il tuo amministratore.</value>
+  </data>
   <data name="OidcInvalidEmailFormat" xml:space="preserve">
     <value>Formato email non valido ricevuto dal provider di identità</value>
   </data>
@@ -2652,6 +2661,15 @@
   </data>
   <data name="GotIt" xml:space="preserve">
     <value>Capito!</value>
+  </data>
+  <data name="UpdateAvailableTitle" xml:space="preserve">
+    <value>Aggiornamento disponibile</value>
+  </data>
+  <data name="UpdateAvailableBody" xml:space="preserve">
+    <value>La versione {0} è disponibile su GitHub.</value>
+  </data>
+  <data name="ViewRelease" xml:space="preserve">
+    <value>Vedi versione</value>
   </data>
 
   <!-- MSA (personal Microsoft account) OAuth2 device code flow -->
@@ -3608,7 +3626,271 @@
   <data name="MailcowNewImapPasswordRequired" xml:space="preserve"><value>Inserisci una nuova password IMAP dopo aver lasciato Mailcow.</value></data>
   <data name="MailcowLinkSuccess" xml:space="preserve"><value>Account collegato all'istanza Mailcow {0}.</value></data>
   <data name="MailcowDetachSuccess" xml:space="preserve"><value>Accesso a Mailcow revocato. Inserisci nuove credenziali per il provider selezionato.</value></data>
+  <data name="DeleteAllMatches" xml:space="preserve">
+    <value>Elimina tutte le corrispondenze</value>
+  </data>
+  <data name="DeleteAllMatchesTitle" xml:space="preserve">
+    <value>Elimina tutte le email corrispondenti</value>
+  </data>
+  <data name="DeleteAllMatchesWarning" xml:space="preserve">
+    <value>Questa operazione elimina definitivamente {0} email corrispondenti al filtro corrente. Non può essere annullata; ogni eliminazione viene registrata.</value>
+  </data>
+  <data name="DeleteAllMatchesLockedInfo" xml:space="preserve">
+    <value>{0} email corrispondenti sono bloccate dalla politica di conservazione e verranno mantenute.</value>
+  </data>
+  <data name="DeleteAllMatchesConfirmLabel" xml:space="preserve">
+    <value>Digitare il numero di email per confermare</value>
+  </data>
+  <data name="DeleteAllMatchesCountChanged" xml:space="preserve">
+    <value>L'insieme dei risultati è cambiato (confermato: {0}, attuale: {1}). Controllare il filtro e confermare di nuovo.</value>
+  </data>
+  <data name="DeleteAllMatchesNoMatches" xml:space="preserve">
+    <value>Nessuna email eliminabile corrisponde a questo filtro.</value>
+  </data>
+  <data name="DeleteAllMatchesNoMatchesLocked" xml:space="preserve">
+    <value>Nessuna email eliminabile corrisponde a questo filtro; {0} email corrispondenti sono bloccate dalla politica di conservazione.</value>
+  </data>
+  <data name="DeleteAllMatchesFilterRequired" xml:space="preserve">
+    <value>Restringere prima l'insieme dei risultati (termine di ricerca, data, cartella o account).</value>
+  </data>
+  <data name="DeleteAllMatchesCapExceeded" xml:space="preserve">
+    <value>{0} corrispondenze superano il massimo configurato di {1}. Restringere il filtro.</value>
+  </data>
+  <data name="DeleteAllMatchesQueued" xml:space="preserve">
+    <value>Processo di eliminazione avviato per {0} email. ID processo: {1}</value>
+  </data>
+  <data name="DeleteAllMatchesPreviewFailed" xml:space="preserve">
+    <value>Impossibile determinare il numero di email corrispondenti. Riprovare.</value>
+  </data>
+  <data name="SkippedLockedEmails" xml:space="preserve">
+    <value>Ignorate (bloccate)</value>
+  </data>
+  <data name="FilterJob" xml:space="preserve">
+    <value>Filtro</value>
+  </data>
   <data name="PasswordLoginDisabledError" xml:space="preserve">
     <value>L'accesso con password è disabilitato. Accedi tramite il tuo provider di identità.</value>
+  </data>
+  <data name="ConfirmCancelDeletion" xml:space="preserve">
+    <value>Annullare l'eliminazione?</value>
+  </data>
+  <data name="DeleteItemUserConfig" xml:space="preserve">
+    <value>Configurazione e impostazioni utente</value>
+  </data>
+  <data name="ExportDownloadError" xml:space="preserve">
+    <value>Impossibile scaricare l'esportazione. Riprova.</value>
+  </data>
+  <data name="Format" xml:space="preserve">
+    <value>Formato</value>
+  </data>
+  <data name="ImportFromTenant" xml:space="preserve">
+    <value>Importa l'intero tenant</value>
+  </data>
+  <data name="Of" xml:space="preserve">
+    <value>di</value>
+  </data>
+  <data name="SelectAccountFirst" xml:space="preserve">
+    <value>Seleziona prima un account</value>
+  </data>
+  <data name="SelectFolder" xml:space="preserve">
+    <value>Seleziona cartella</value>
+  </data>
+  <data name="OriginalMissing" xml:space="preserve">
+    <value>Originale mancante</value>
+  </data>
+  <data name="OriginalMissingHint" xml:space="preserve">
+    <value>Il messaggio originale non è stato salvato per questa email. L'archivio può fornire solo una ricostruzione.</value>
+  </data>
+  <data name="InvoicePdf.Invoice" xml:space="preserve">
+    <value>Fattura</value>
+  </data>
+  <data name="InvoicePdf.CreditNote" xml:space="preserve">
+    <value>Nota di credito</value>
+  </data>
+  <data name="InvoicePdf.InvoiceNumber" xml:space="preserve">
+    <value>Numero fattura</value>
+  </data>
+  <data name="InvoicePdf.InvoiceDate" xml:space="preserve">
+    <value>Data fattura</value>
+  </data>
+  <data name="InvoicePdf.DueShort" xml:space="preserve">
+    <value>Scadenza</value>
+  </data>
+  <data name="InvoicePdf.Seller" xml:space="preserve">
+    <value>Cedente</value>
+  </data>
+  <data name="InvoicePdf.Buyer" xml:space="preserve">
+    <value>Cessionario</value>
+  </data>
+  <data name="InvoicePdf.PayeeDifferent" xml:space="preserve">
+    <value>Beneficiario (diverso)</value>
+  </data>
+  <data name="InvoicePdf.ShipTo" xml:space="preserve">
+    <value>Indirizzo di consegna</value>
+  </data>
+  <data name="InvoicePdf.TaxRepresentative" xml:space="preserve">
+    <value>Rappresentante fiscale</value>
+  </data>
+  <data name="InvoicePdf.Contact" xml:space="preserve">
+    <value>Contatto</value>
+  </data>
+  <data name="InvoicePdf.VatId" xml:space="preserve">
+    <value>Partita IVA</value>
+  </data>
+  <data name="InvoicePdf.TaxNumber" xml:space="preserve">
+    <value>Codice fiscale</value>
+  </data>
+  <data name="InvoicePdf.Register" xml:space="preserve">
+    <value>Registro</value>
+  </data>
+  <data name="InvoicePdf.Details" xml:space="preserve">
+    <value>Dati fattura</value>
+  </data>
+  <data name="InvoicePdf.BuyerReference" xml:space="preserve">
+    <value>Riferimento acquirente</value>
+  </data>
+  <data name="InvoicePdf.Currency" xml:space="preserve">
+    <value>Valuta</value>
+  </data>
+  <data name="InvoicePdf.DueDate" xml:space="preserve">
+    <value>Data di scadenza</value>
+  </data>
+  <data name="InvoicePdf.DeliveryDate" xml:space="preserve">
+    <value>Data di consegna</value>
+  </data>
+  <data name="InvoicePdf.BillingPeriod" xml:space="preserve">
+    <value>Periodo di fatturazione</value>
+  </data>
+  <data name="InvoicePdf.BuyerOrder" xml:space="preserve">
+    <value>Riferimento ordine acquirente</value>
+  </data>
+  <data name="InvoicePdf.SalesOrder" xml:space="preserve">
+    <value>Riferimento ordine venditore</value>
+  </data>
+  <data name="InvoicePdf.Contract" xml:space="preserve">
+    <value>Riferimento contratto</value>
+  </data>
+  <data name="InvoicePdf.Project" xml:space="preserve">
+    <value>Riferimento progetto</value>
+  </data>
+  <data name="InvoicePdf.DespatchAdvice" xml:space="preserve">
+    <value>Documento di trasporto</value>
+  </data>
+  <data name="InvoicePdf.BuyerAccount" xml:space="preserve">
+    <value>Riferimento contabile acquirente</value>
+  </data>
+  <data name="InvoicePdf.SellerVatId" xml:space="preserve">
+    <value>Partita IVA cedente</value>
+  </data>
+  <data name="InvoicePdf.BuyerVatId" xml:space="preserve">
+    <value>Partita IVA cessionario</value>
+  </data>
+  <data name="InvoicePdf.Lines" xml:space="preserve">
+    <value>Righe fattura</value>
+  </data>
+  <data name="InvoicePdf.Description" xml:space="preserve">
+    <value>Descrizione</value>
+  </data>
+  <data name="InvoicePdf.Quantity" xml:space="preserve">
+    <value>Quantità</value>
+  </data>
+  <data name="InvoicePdf.Unit" xml:space="preserve">
+    <value>Unità</value>
+  </data>
+  <data name="InvoicePdf.UnitPrice" xml:space="preserve">
+    <value>Prezzo unitario</value>
+  </data>
+  <data name="InvoicePdf.TaxRate" xml:space="preserve">
+    <value>IVA</value>
+  </data>
+  <data name="InvoicePdf.Amount" xml:space="preserve">
+    <value>Importo</value>
+  </data>
+  <data name="InvoicePdf.NoLines" xml:space="preserve">
+    <value>Nessuna riga di fattura trasmessa.</value>
+  </data>
+  <data name="InvoicePdf.AllowancesCharges" xml:space="preserve">
+    <value>Sconti e maggiorazioni</value>
+  </data>
+  <data name="InvoicePdf.Allowance" xml:space="preserve">
+    <value>Sconto</value>
+  </data>
+  <data name="InvoicePdf.Charge" xml:space="preserve">
+    <value>Maggiorazione</value>
+  </data>
+  <data name="InvoicePdf.SumLines" xml:space="preserve">
+    <value>Somma righe (netto)</value>
+  </data>
+  <data name="InvoicePdf.Charges" xml:space="preserve">
+    <value>Maggiorazioni</value>
+  </data>
+  <data name="InvoicePdf.Allowances" xml:space="preserve">
+    <value>Sconti</value>
+  </data>
+  <data name="InvoicePdf.TaxBasis" xml:space="preserve">
+    <value>Base imponibile</value>
+  </data>
+  <data name="InvoicePdf.GrandTotal" xml:space="preserve">
+    <value>Totale fattura (lordo)</value>
+  </data>
+  <data name="InvoicePdf.Prepaid" xml:space="preserve">
+    <value>Già pagato</value>
+  </data>
+  <data name="InvoicePdf.Rounding" xml:space="preserve">
+    <value>Arrotondamento</value>
+  </data>
+  <data name="InvoicePdf.Payable" xml:space="preserve">
+    <value>Importo dovuto</value>
+  </data>
+  <data name="InvoicePdf.PaymentMeans" xml:space="preserve">
+    <value>Modalità di pagamento</value>
+  </data>
+  <data name="InvoicePdf.Iban" xml:space="preserve">
+    <value>IBAN</value>
+  </data>
+  <data name="InvoicePdf.Bic" xml:space="preserve">
+    <value>BIC</value>
+  </data>
+  <data name="InvoicePdf.AccountHolder" xml:space="preserve">
+    <value>Intestatario del conto</value>
+  </data>
+  <data name="InvoicePdf.PaymentReference" xml:space="preserve">
+    <value>Riferimento pagamento</value>
+  </data>
+  <data name="InvoicePdf.MandateReference" xml:space="preserve">
+    <value>Riferimento mandato</value>
+  </data>
+  <data name="InvoicePdf.PaymentTerms" xml:space="preserve">
+    <value>Condizioni di pagamento</value>
+  </data>
+  <data name="InvoicePdf.PaymentInfo" xml:space="preserve">
+    <value>Informazioni di pagamento</value>
+  </data>
+  <data name="InvoicePdf.Notes" xml:space="preserve">
+    <value>Note</value>
+  </data>
+  <data name="InvoicePdf.PageOf" xml:space="preserve">
+    <value>Pagina {0} di {1}</value>
+  </data>
+  <data name="InvoicePdf.MoreLines" xml:space="preserve">
+    <value>Altre {0} righe sono solo nel XML.</value>
+  </data>
+  <data name="InvoicePdf.Disclaimer" xml:space="preserve">
+    <value>Vista interna, non è l'originale giuridicamente vincolante. Fa fede esclusivamente il file XML trasmesso.</value>
+  </data>
+  <data name="InvoicePdf.NotStated" xml:space="preserve">
+    <value>non indicato</value>
+  </data>
+  <data name="XRechnung" xml:space="preserve">
+    <value>XRechnung</value>
+  </data>
+  <data name="DownloadPdf" xml:space="preserve">
+    <value>Scarica PDF</value>
+  </data>
+  <data name="DownloadOriginalXml" xml:space="preserve">
+    <value>Scarica XML originale</value>
+  </data>
+  <data name="InvoicePreviewNotice" xml:space="preserve">
+    <value>Vista PDF interna, non è l'originale giuridicamente vincolante. Fa fede esclusivamente il file XML trasmesso.</value>
   </data>
 </root>

@@ -178,6 +178,14 @@ Set it up once, keep every message, and find it again years later.
 
     [:octicons-arrow-right-24: Read](Export-Account.md)
 
+-   :material-email-lock:{ .lg .middle } __Original message storage__
+
+    ---
+
+    Keep the message as received, so DKIM still verifies and exports are byte-exact.
+
+    [:octicons-arrow-right-24: Read](RawMessages.md)
+
 -   :material-content-duplicate:{ .lg .middle } __Attachment deduplication__
 
     ---
@@ -185,6 +193,14 @@ Set it up once, keep every message, and find it again years later.
     How identical attachments are stored once instead of many times.
 
     [:octicons-arrow-right-24: Read](AttachmentDeduplication.md)
+
+-   :material-file-pdf-box:{ .lg .middle } __XRechnung invoice preview__
+
+    ---
+
+    Read XRechnung XML attachments as a PDF directly in the archive.
+
+    [:octicons-arrow-right-24: Read](EInvoicing.md)
 
 -   :material-calendar-arrow-right:{ .lg .middle } __Date-windowed offload__
 
@@ -362,6 +378,14 @@ Set it up once, keep every message, and find it again years later.
     Read container logs and change the log level.
 
     [:octicons-arrow-right-24: Read](DockerComposeLogs.md)
+
+-   :material-heart-pulse:{ .lg .middle } __Health and metrics__
+
+    ---
+
+    Watch liveness, readiness and archive metrics from Prometheus or another monitoring system.
+
+    [:octicons-arrow-right-24: Read](Monitoring.md)
 
 -   :material-tag:{ .lg .middle } __Development versions__
 

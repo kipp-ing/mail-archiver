@@ -267,6 +267,11 @@ namespace MailArchiver.Controllers
 
                     // Update user properties
                     _logger.LogInformation("Updating user properties for user: {Username}", existingUser.Username);
+
+                    // A changed role, activation status or password is detected by
+                    // UserService.UpdateUserAsync, which rotates the security stamp so the
+                    // cookies issued for the old state stop working.
+
                     existingUser.Username = model.Username;
                     existingUser.Email = model.Email;
                     existingUser.IsAdmin = model.IsAdmin;
@@ -606,11 +611,17 @@ namespace MailArchiver.Controllers
                         // Update password
                         try
                         {
+                            // SECURITY: UpdateUserAsync rotates the security stamp because the
+                            // password hash changed, so every other session for this user is
+                            // rejected on its next request. The current session is re-issued
+                            // below with the new stamp and stays signed in.
                             currentUser.PasswordHash = _userService.HashPassword(newPassword);
                             var result = await _userService.UpdateUserAsync(currentUser);
 
                             if (result)
                             {
+                                await _authService.RefreshSessionAsync(currentUser);
+
                                 // Clear the forced password change flag
                                 if (mustChangePassword)
                                 {

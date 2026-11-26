@@ -145,6 +145,12 @@
   <data name="PageOf" xml:space="preserve">
     <value>第 {0} 页，共 {1} 页</value>
   </data>
+  <data name="GoToPage" xml:space="preserve">
+    <value>跳转到页面</value>
+  </data>
+  <data name="Go" xml:space="preserve">
+    <value>跳转</value>
+  </data>
   <data name="SelectAll" xml:space="preserve">
     <value>全选</value>
   </data>
@@ -2104,6 +2110,9 @@
   <data name="MaxSelectionsReached" xml:space="preserve">
     <value>已达到最大选择数量（{0}）</value>
   </data>
+  <data name="SelectAllMatching" xml:space="preserve">
+    <value>选择全部 {0} 个匹配项</value>
+  </data>
   <data name="SelectAllOnPage" xml:space="preserve">
     <value>选择本页全部</value>
   </data>
@@ -2334,6 +2343,12 @@
   </data>
   <data name="OidcClaimLengthExceeded" xml:space="preserve">
     <value>声明值超过最大允许长度</value>
+  </data>
+  <data name="OidcMissingClaim" xml:space="preserve">
+    <value>您的身份提供商未返回必需的声明 ({0})。请联系管理员。</value>
+  </data>
+  <data name="OidcLoginFailed" xml:space="preserve">
+    <value>通过单点登录登录失败。请重试或联系管理员。</value>
   </data>
   <data name="AccountDeletionQueued" xml:space="preserve">
     <value>账户 '{0}' 的删除已排队，将在后台处理。</value>
@@ -2655,6 +2670,15 @@
   </data>
   <data name="GotIt" xml:space="preserve">
     <value>知道了！</value>
+  </data>
+  <data name="UpdateAvailableTitle" xml:space="preserve">
+    <value>有可用更新</value>
+  </data>
+  <data name="UpdateAvailableBody" xml:space="preserve">
+    <value>版本 {0} 已在 GitHub 上发布。</value>
+  </data>
+  <data name="ViewRelease" xml:space="preserve">
+    <value>查看版本</value>
   </data>
   <data name="MsaAuthorizeTitle" xml:space="preserve">
     <value>授权 Microsoft 账户</value>
@@ -3571,7 +3595,271 @@
   <data name="MailcowNewImapPasswordRequired" xml:space="preserve"><value>离开 Mailcow 后请输入新的 IMAP 密码。</value></data>
   <data name="MailcowLinkSuccess" xml:space="preserve"><value>账户已关联到 Mailcow 实例 {0}。</value></data>
   <data name="MailcowDetachSuccess" xml:space="preserve"><value>Mailcow 访问已撤销。请为所选提供商输入新凭据。</value></data>
+  <data name="DeleteAllMatches" xml:space="preserve">
+    <value>删除所有匹配项</value>
+  </data>
+  <data name="DeleteAllMatchesTitle" xml:space="preserve">
+    <value>删除所有匹配的邮件</value>
+  </data>
+  <data name="DeleteAllMatchesWarning" xml:space="preserve">
+    <value>这将永久删除与当前筛选条件匹配的 {0} 封邮件。此操作无法撤销；每次删除都会记录在案。</value>
+  </data>
+  <data name="DeleteAllMatchesLockedInfo" xml:space="preserve">
+    <value>有 {0} 封匹配的邮件被保留策略锁定，将被保留。</value>
+  </data>
+  <data name="DeleteAllMatchesConfirmLabel" xml:space="preserve">
+    <value>输入邮件数量以确认</value>
+  </data>
+  <data name="DeleteAllMatchesCountChanged" xml:space="preserve">
+    <value>结果集已更改（已确认：{0}，当前：{1}）。请检查筛选条件并重新确认。</value>
+  </data>
+  <data name="DeleteAllMatchesNoMatches" xml:space="preserve">
+    <value>没有可删除的邮件与此筛选条件匹配。</value>
+  </data>
+  <data name="DeleteAllMatchesNoMatchesLocked" xml:space="preserve">
+    <value>没有可删除的邮件与此筛选条件匹配；有 {0} 封匹配的邮件被保留策略锁定。</value>
+  </data>
+  <data name="DeleteAllMatchesFilterRequired" xml:space="preserve">
+    <value>请先缩小结果集（搜索词、日期、文件夹或账户）。</value>
+  </data>
+  <data name="DeleteAllMatchesCapExceeded" xml:space="preserve">
+    <value>{0} 个匹配项超过配置的上限 {1}。请缩小筛选范围。</value>
+  </data>
+  <data name="DeleteAllMatchesQueued" xml:space="preserve">
+    <value>已为 {0} 封邮件启动删除任务。任务 ID：{1}</value>
+  </data>
+  <data name="DeleteAllMatchesPreviewFailed" xml:space="preserve">
+    <value>无法确定匹配的邮件数量。请重试。</value>
+  </data>
+  <data name="SkippedLockedEmails" xml:space="preserve">
+    <value>已跳过（已锁定）</value>
+  </data>
+  <data name="FilterJob" xml:space="preserve">
+    <value>筛选条件</value>
+  </data>
   <data name="PasswordLoginDisabledError" xml:space="preserve">
     <value>密码登录已禁用。请通过您的身份提供商登录。</value>
+  </data>
+  <data name="ConfirmCancelDeletion" xml:space="preserve">
+    <value>取消删除?</value>
+  </data>
+  <data name="DeleteItemUserConfig" xml:space="preserve">
+    <value>用户配置和设置</value>
+  </data>
+  <data name="ExportDownloadError" xml:space="preserve">
+    <value>无法下载导出文件。请重试。</value>
+  </data>
+  <data name="Format" xml:space="preserve">
+    <value>格式</value>
+  </data>
+  <data name="ImportFromTenant" xml:space="preserve">
+    <value>导入整个租户</value>
+  </data>
+  <data name="Of" xml:space="preserve">
+    <value>/</value>
+  </data>
+  <data name="SelectAccountFirst" xml:space="preserve">
+    <value>请先选择账户</value>
+  </data>
+  <data name="SelectFolder" xml:space="preserve">
+    <value>选择文件夹</value>
+  </data>
+  <data name="OriginalMissing" xml:space="preserve">
+    <value>缺少原件</value>
+  </data>
+  <data name="OriginalMissingHint" xml:space="preserve">
+    <value>此邮件未保存原始邮件。归档只能提供重建版本。</value>
+  </data>
+  <data name="InvoicePdf.Invoice" xml:space="preserve">
+    <value>发票</value>
+  </data>
+  <data name="InvoicePdf.CreditNote" xml:space="preserve">
+    <value>贷项通知单</value>
+  </data>
+  <data name="InvoicePdf.InvoiceNumber" xml:space="preserve">
+    <value>发票号码</value>
+  </data>
+  <data name="InvoicePdf.InvoiceDate" xml:space="preserve">
+    <value>发票日期</value>
+  </data>
+  <data name="InvoicePdf.DueShort" xml:space="preserve">
+    <value>到期日</value>
+  </data>
+  <data name="InvoicePdf.Seller" xml:space="preserve">
+    <value>销售方</value>
+  </data>
+  <data name="InvoicePdf.Buyer" xml:space="preserve">
+    <value>购买方</value>
+  </data>
+  <data name="InvoicePdf.PayeeDifferent" xml:space="preserve">
+    <value>收款方（不同）</value>
+  </data>
+  <data name="InvoicePdf.ShipTo" xml:space="preserve">
+    <value>收货地址</value>
+  </data>
+  <data name="InvoicePdf.TaxRepresentative" xml:space="preserve">
+    <value>税务代表</value>
+  </data>
+  <data name="InvoicePdf.Contact" xml:space="preserve">
+    <value>联系人</value>
+  </data>
+  <data name="InvoicePdf.VatId" xml:space="preserve">
+    <value>增值税号</value>
+  </data>
+  <data name="InvoicePdf.TaxNumber" xml:space="preserve">
+    <value>税号</value>
+  </data>
+  <data name="InvoicePdf.Register" xml:space="preserve">
+    <value>注册号</value>
+  </data>
+  <data name="InvoicePdf.Details" xml:space="preserve">
+    <value>发票信息</value>
+  </data>
+  <data name="InvoicePdf.BuyerReference" xml:space="preserve">
+    <value>买方参考号</value>
+  </data>
+  <data name="InvoicePdf.Currency" xml:space="preserve">
+    <value>币种</value>
+  </data>
+  <data name="InvoicePdf.DueDate" xml:space="preserve">
+    <value>到期日期</value>
+  </data>
+  <data name="InvoicePdf.DeliveryDate" xml:space="preserve">
+    <value>交付日期</value>
+  </data>
+  <data name="InvoicePdf.BillingPeriod" xml:space="preserve">
+    <value>计费期间</value>
+  </data>
+  <data name="InvoicePdf.BuyerOrder" xml:space="preserve">
+    <value>买方订单参考</value>
+  </data>
+  <data name="InvoicePdf.SalesOrder" xml:space="preserve">
+    <value>卖方订单参考</value>
+  </data>
+  <data name="InvoicePdf.Contract" xml:space="preserve">
+    <value>合同参考</value>
+  </data>
+  <data name="InvoicePdf.Project" xml:space="preserve">
+    <value>项目参考</value>
+  </data>
+  <data name="InvoicePdf.DespatchAdvice" xml:space="preserve">
+    <value>发货通知</value>
+  </data>
+  <data name="InvoicePdf.BuyerAccount" xml:space="preserve">
+    <value>买方账户参考</value>
+  </data>
+  <data name="InvoicePdf.SellerVatId" xml:space="preserve">
+    <value>销售方增值税号</value>
+  </data>
+  <data name="InvoicePdf.BuyerVatId" xml:space="preserve">
+    <value>购买方增值税号</value>
+  </data>
+  <data name="InvoicePdf.Lines" xml:space="preserve">
+    <value>发票行</value>
+  </data>
+  <data name="InvoicePdf.Description" xml:space="preserve">
+    <value>描述</value>
+  </data>
+  <data name="InvoicePdf.Quantity" xml:space="preserve">
+    <value>数量</value>
+  </data>
+  <data name="InvoicePdf.Unit" xml:space="preserve">
+    <value>单位</value>
+  </data>
+  <data name="InvoicePdf.UnitPrice" xml:space="preserve">
+    <value>单价</value>
+  </data>
+  <data name="InvoicePdf.TaxRate" xml:space="preserve">
+    <value>增值税</value>
+  </data>
+  <data name="InvoicePdf.Amount" xml:space="preserve">
+    <value>金额</value>
+  </data>
+  <data name="InvoicePdf.NoLines" xml:space="preserve">
+    <value>未提交发票行。</value>
+  </data>
+  <data name="InvoicePdf.AllowancesCharges" xml:space="preserve">
+    <value>折扣和附加费</value>
+  </data>
+  <data name="InvoicePdf.Allowance" xml:space="preserve">
+    <value>折扣</value>
+  </data>
+  <data name="InvoicePdf.Charge" xml:space="preserve">
+    <value>附加费</value>
+  </data>
+  <data name="InvoicePdf.SumLines" xml:space="preserve">
+    <value>行合计（净额）</value>
+  </data>
+  <data name="InvoicePdf.Charges" xml:space="preserve">
+    <value>附加费</value>
+  </data>
+  <data name="InvoicePdf.Allowances" xml:space="preserve">
+    <value>折扣</value>
+  </data>
+  <data name="InvoicePdf.TaxBasis" xml:space="preserve">
+    <value>计税基础</value>
+  </data>
+  <data name="InvoicePdf.GrandTotal" xml:space="preserve">
+    <value>发票总额（含税）</value>
+  </data>
+  <data name="InvoicePdf.Prepaid" xml:space="preserve">
+    <value>已支付</value>
+  </data>
+  <data name="InvoicePdf.Rounding" xml:space="preserve">
+    <value>舍入</value>
+  </data>
+  <data name="InvoicePdf.Payable" xml:space="preserve">
+    <value>应付金额</value>
+  </data>
+  <data name="InvoicePdf.PaymentMeans" xml:space="preserve">
+    <value>付款方式</value>
+  </data>
+  <data name="InvoicePdf.Iban" xml:space="preserve">
+    <value>IBAN</value>
+  </data>
+  <data name="InvoicePdf.Bic" xml:space="preserve">
+    <value>BIC</value>
+  </data>
+  <data name="InvoicePdf.AccountHolder" xml:space="preserve">
+    <value>账户持有人</value>
+  </data>
+  <data name="InvoicePdf.PaymentReference" xml:space="preserve">
+    <value>付款参考</value>
+  </data>
+  <data name="InvoicePdf.MandateReference" xml:space="preserve">
+    <value>授权参考</value>
+  </data>
+  <data name="InvoicePdf.PaymentTerms" xml:space="preserve">
+    <value>付款条件</value>
+  </data>
+  <data name="InvoicePdf.PaymentInfo" xml:space="preserve">
+    <value>付款信息</value>
+  </data>
+  <data name="InvoicePdf.Notes" xml:space="preserve">
+    <value>备注</value>
+  </data>
+  <data name="InvoicePdf.PageOf" xml:space="preserve">
+    <value>第 {0} 页，共 {1} 页</value>
+  </data>
+  <data name="InvoicePdf.MoreLines" xml:space="preserve">
+    <value>另有 {0} 行仅存在于 XML 中。</value>
+  </data>
+  <data name="InvoicePdf.Disclaimer" xml:space="preserve">
+    <value>内部视图，不是具有法律效力的原始文件。以提交的 XML 文件为准。</value>
+  </data>
+  <data name="InvoicePdf.NotStated" xml:space="preserve">
+    <value>未提供</value>
+  </data>
+  <data name="XRechnung" xml:space="preserve">
+    <value>XRechnung</value>
+  </data>
+  <data name="DownloadPdf" xml:space="preserve">
+    <value>下载 PDF</value>
+  </data>
+  <data name="DownloadOriginalXml" xml:space="preserve">
+    <value>下载原始 XML</value>
+  </data>
+  <data name="InvoicePreviewNotice" xml:space="preserve">
+    <value>内部 PDF 视图，不是具有法律效力的原始文件。以提交的 XML 文件为准。</value>
   </data>
 </root>

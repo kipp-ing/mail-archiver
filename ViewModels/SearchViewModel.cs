@@ -58,6 +58,7 @@ namespace MailArchiver.Models.ViewModels
         // Suchergebnisse
         public List<ArchivedEmail> SearchResults { get; set; }
         public int TotalResults { get; set; }
+
         public int TotalPages => (int)Math.Ceiling(TotalResults / (double)PageSize);
 
         // Für die Batch-Operationen

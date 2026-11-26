@@ -1,0 +1,191 @@
+name: Translate documentation
+
+# Translates changed English pages into every locale that exists in
+# Resources/SharedResource.*.resx and commits the result directly to main.
+# English stays the source of truth; the translated files are plain Markdown
+# next to their source.
+#
+# Each locale runs in its own matrix job. The files are disjoint per locale
+# (Page.de.md, Page.es.md) and every locale writes its own manifest
+# (translations.de.json), so the jobs can commit and push without conflicts.
+#
+# Required repository configuration:
+#   secret   LLM_API_KEY    key for the chat-completions endpoint
+#   variable LLM_BASE_URL   base URL, for example https://openrouter.ai/api/v1
+#   variable LLM_MODEL      model name, for example openai/gpt-4o-mini
+#
+# When LLM_API_KEY is absent the job still builds the site and exits without a
+# translation commit, so forks and fresh checkouts stay green.
+
+on:
+  workflow_dispatch:
+    inputs:
+      language:
+        description: "Translate one locale only, for example de. Leave empty for all locales."
+        required: false
+        default: ""
+  push:
+    branches: [main]
+    paths:
+      - 'doc/**'
+      - 'tools/translate_docs.py'
+      - 'doc/i18n/**'
+      - 'mkdocs.yml'
+      - 'requirements-docs.txt'
+      - '.github/workflows/translate-docs.yml'
+
+permissions:
+  contents: write
+  # Needed to start docs.yml after a translation run: commits pushed with the
+  # GITHUB_TOKEN do not trigger other workflows on their own.
+  actions: write
+
+concurrency:
+  group: docs-translations
+  cancel-in-progress: true
+
+jobs:
+  languages:
+    # The translation commits themselves touch doc/**, which matches the push
+    # filter. Skip those runs so the workflow does not trigger itself.
+    if: github.event_name != 'push' || github.event.head_commit.author.name != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the locale matrix
+        id: set
+        env:
+          LANGUAGE: ${{ inputs.language }}
+        run: |
+          set -euo pipefail
+          if [ -n "${LANGUAGE:-}" ]; then
+            MATRIX=$(printf '["%s"]' "$LANGUAGE")
+          else
+            MATRIX=$(ls Resources/SharedResource.*.resx \
+              | sed -E 's/.*SharedResource\.(.*)\.resx/\1/' \
+              | grep -v '^en-GB$' \
+              | sort \
+              | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          fi
+          echo "matrix={\"language\":$MATRIX}" >> "$GITHUB_OUTPUT"
+
+  translate:
+    needs: languages
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix: ${{ fromJson(needs.languages.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # The revision-date plugin needs the full history.
+          fetch-depth: 0
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - name: Install documentation dependencies
+        run: python -m pip install -r requirements-docs.txt
+
+      - name: Translate ${{ matrix.language }}
+        timeout-minutes: 350
+        env:
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          python tools/translate_docs.py \
+            --lang "${{ matrix.language }}" \
+            --max-seconds 18000
+
+          git add doc
+          if git diff --cached --quiet; then
+            echo "No changes for ${{ matrix.language }}."
+            exit 0
+          fi
+
+          git commit -m "docs: update ${{ matrix.language }} translations"
+
+          # Several locale jobs push at the same time. Rebase onto the latest
+          # main and retry; the files and manifests are disjoint.
+          for attempt in 1 2 3 4 5; do
+            git pull --rebase origin main || {
+              git rebase --abort || true
+              sleep 5
+              continue
+            }
+            if git push origin main; then
+              exit 0
+            fi
+            sleep $((attempt * 5))
+          done
+          echo "::error::Could not push the translations for ${{ matrix.language }}."
+          exit 1
+
+  build:
+    needs: translate
+    if: always() && needs.translate.result != 'cancelled'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # git-revision-date-localized needs the full history.
+          fetch-depth: 0
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - name: Install documentation dependencies
+        run: python -m pip install -r requirements-docs.txt
+
+      - name: Translate navigation labels
+        env:
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+        run: python tools/translate_docs.py --nav
+
+      - name: Commit navigation labels
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add doc/i18n/nav.yml
+          if git diff --cached --quiet; then
+            echo "Navigation labels are current."
+            exit 0
+          fi
+          git commit -m "docs: update navigation labels"
+          git pull --rebase origin main
+          git push origin main
+
+      - name: Build site
+        # --strict turns a broken link or a missing revision date into a failure.
+        run: mkdocs build --strict
+
+      - name: Trigger the documentation deployment
+        # docs.yml does not run for commits pushed with the GITHUB_TOKEN, so
+        # start it explicitly after the translations are on main.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run docs.yml --repo ${{ github.repository }} --ref main

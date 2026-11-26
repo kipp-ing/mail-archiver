@@ -30,5 +30,23 @@ namespace MailArchiver.Models.ViewModels
         /// Indicates if the email has plain text content available
         /// </summary>
         public bool HasPlainTextBody { get; set; }
+
+        /// <summary>
+        /// Whether a stored original exists for this email. Resolved through IRawMessageStore,
+        /// so a filesystem-backed row whose file vanished counts as missing.
+        /// </summary>
+        public bool HasRawMessage { get; set; }
+
+        /// <summary>
+        /// Whether RawMessages is enabled. The details page only shows the missing-original
+        /// notice when it is.
+        /// </summary>
+        public bool RawMessagesEnabled { get; set; }
+
+        /// <summary>
+        /// Attachment IDs whose XML content was detected as an XRechnung. The details
+        /// page shows the XRechnung badge and links the PDF preview for these.
+        /// </summary>
+        public HashSet<int> XRechnungAttachmentIds { get; set; } = new();
     }
 }

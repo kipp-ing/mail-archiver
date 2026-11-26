@@ -133,6 +133,12 @@ builder.Services.Configure<MailSyncOptions>(
 builder.Services.Configure<RawMessageOptions>(
     builder.Configuration.GetSection(RawMessageOptions.RawMessages));
 
+// Add Monitoring Options (health endpoints and Prometheus metrics, opt-in)
+builder.Services.Configure<HealthOptions>(
+    builder.Configuration.GetSection(HealthOptions.Health));
+builder.Services.Configure<MetricsOptions>(
+    builder.Configuration.GetSection(MetricsOptions.Metrics));
+
 // Add Upload Options
 builder.Services.Configure<UploadOptions>(
     builder.Configuration.GetSection(UploadOptions.Upload));
@@ -206,6 +212,8 @@ if (mcpEnabled)
 
 // Add DateTimeHelper
 builder.Services.AddScoped<MailArchiver.Utilities.DateTimeHelper>();
+builder.Services.AddSingleton<MailArchiver.Services.EInvoicing.InvoicePdfLabelProvider>();
+builder.Services.AddScoped<MailArchiver.Services.EInvoicing.InvoicePdfService>();
 
 // Add HTTP Client factory (used by VersionUpdateService for GitHub API calls)
 builder.Services.AddHttpClient("GitHubReleases");
@@ -452,6 +460,22 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAccountAccessResolver, AccountAccessResolver>();
 builder.Services.AddSingleton<ISyncJobService, SyncJobService>(); // NEUE SERVICE
 
+// Monitoring: process-local counters, the last metrics snapshot, and the refresh loop.
+// The endpoint only reads the snapshot, so a scrape never scans the archive.
+builder.Services.AddSingleton<MailArchiver.Services.Monitoring.MetricsRecorder>();
+builder.Services.AddSingleton<MailArchiver.Services.Monitoring.IMetricsRecorder>(
+    provider => provider.GetRequiredService<MailArchiver.Services.Monitoring.MetricsRecorder>());
+builder.Services.AddSingleton<MailArchiver.Services.Monitoring.MetricsStore>();
+builder.Services.AddHostedService<MailArchiver.Services.Monitoring.MetricsRefreshService>();
+
+// Health checks are executed by MonitoringApiController, not mapped as public endpoints:
+// every /api/v1/health path goes through the existing API key authentication and AdminOnly.
+builder.Services.AddHealthChecks()
+    .AddCheck<MailArchiver.Services.Monitoring.DatabaseHealthCheck>(
+        "database", tags: new[] { "ready" })
+    .AddCheck<MailArchiver.Services.Monitoring.SyncFreshnessHealthCheck>(
+        "sync", tags: new[] { "sync" });
+
 // Register BatchRestoreService as singleton and hosted service - MUST be the same instance
 builder.Services.AddSingleton<BatchRestoreService>();
 builder.Services.AddSingleton<IBatchRestoreService>(provider => provider.GetRequiredService<BatchRestoreService>());
@@ -474,6 +498,8 @@ builder.Services.AddScoped<MailArchiver.Services.Shared.FileSystemRawMessageStor
 builder.Services.AddScoped<MailArchiver.Services.Shared.IRawMessageStore,
     MailArchiver.Services.Shared.RawMessageStoreRouter>();
 builder.Services.AddScoped<MailArchiver.Services.Shared.RawMessageStorageMigrator>();
+builder.Services.AddScoped<MailArchiver.Services.Shared.RawMessageOrphanCollector>();
+builder.Services.AddHostedService<MailArchiver.Services.RawMessageOrphanCleanupService>();
 
 // EML import services (refactored from monolithic EmlImportService)
 builder.Services.AddScoped<MailArchiver.Services.Providers.Eml.EmlMailCleaner>();
@@ -648,16 +674,22 @@ if (cliArgs.Contains("--migrate-raw-storage"))
         var migrator = migrateScope.ServiceProvider.GetRequiredService<MailArchiver.Services.Shared.RawMessageStorageMigrator>();
 
         var moved = 0;
-        var failed = 0;
+        var failedIds = new HashSet<int>();
         var errors = new List<string>();
 
         // Loop until the source backend has no rows left, so one invocation drains the archive.
+        // Rows that failed stay on the source; they are passed back as an exclusion list so a
+        // corrupt message is reported once instead of once per remaining batch.
         while (true)
         {
-            var result = await migrator.MigrateAsync(fromStorage, toStorage, batchSize);
+            var result = await migrator.MigrateAsync(
+                fromStorage, toStorage, batchSize, excludeEmailIds: failedIds);
             moved += result.Moved;
-            failed += result.Failed;
             errors.AddRange(result.Errors);
+            foreach (var emailId in result.FailedEmailIds)
+            {
+                failedIds.Add(emailId);
+            }
 
             Console.WriteLine($"Batch: {result.Moved} moved, {result.Skipped} skipped, {result.Failed} failed");
 
@@ -673,13 +705,13 @@ if (cliArgs.Contains("--migrate-raw-storage"))
             }
         }
 
-        Console.WriteLine($"Done: {moved} moved, {failed} failed.");
+        Console.WriteLine($"Done: {moved} moved, {failedIds.Count} failed.");
         foreach (var error in errors)
         {
             Console.WriteLine($"  {error}");
         }
 
-        Environment.Exit(failed > 0 ? 1 : 0);
+        Environment.Exit(failedIds.Count > 0 ? 1 : 0);
     }
     catch (Exception ex)
     {
@@ -1221,6 +1253,15 @@ var localizationOptions = new RequestLocalizationOptions()
     .AddSupportedUICultures(supportedCultures);
 
 app.UseRequestLocalization(localizationOptions);
+
+// Authentication is registered explicitly so it sits after UseStaticFiles: the cookie
+// handler validates the security stamp against the database on every request, and static
+// assets (CSS, JS, icons) need no identity. Without this call WebApplication inserts the
+// middleware at the very start of the pipeline, which costs one Users query per asset.
+// It also runs after UseForwardedHeaders now, so the OIDC callback sees the real scheme
+// and client IP, and after the localization middleware, so a rejected login is localized.
+app.UseAuthentication();
+
 app.UseRouting();
 app.UseSession();
 

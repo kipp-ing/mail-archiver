@@ -5,6 +5,7 @@ using MailArchiver.Models.ViewModels;
 using MailArchiver.Services;
 using MailArchiver.Services.Providers;
 using MailArchiver.Services.Shared;
+using MailArchiver.Services.EInvoicing;
 using MailArchiver.ViewModels;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -39,6 +40,8 @@ namespace MailArchiver.Controllers
         private readonly IEmailDeletionService? _emailDeletionService;
         private readonly ViewOptions _viewOptions;
         private readonly DeletionPolicyOptions _deletionPolicy;
+        private readonly RawMessageOptions _rawMessageOptions;
+        private readonly IRawMessageStore? _rawMessageStore;
 
         public EmailsController(
             MailArchiverDbContext context,
@@ -58,7 +61,9 @@ namespace MailArchiver.Controllers
             IAccessLogService? accessLogService = null,
             IServiceScopeFactory? serviceScopeFactory = null,
             MailArchiver.Services.IAuthenticationService? authService = null,
-            IEmailDeletionService? emailDeletionService = null)
+            IEmailDeletionService? emailDeletionService = null,
+            IOptions<RawMessageOptions>? rawMessageOptions = null,
+            IRawMessageStore? rawMessageStore = null)
 
         {
             _context = context;
@@ -79,6 +84,8 @@ namespace MailArchiver.Controllers
             _serviceScopeFactory = serviceScopeFactory;
             _authService = authService;
             _emailDeletionService = emailDeletionService;
+            _rawMessageOptions = rawMessageOptions?.Value ?? new RawMessageOptions();
+            _rawMessageStore = rawMessageStore;
         }
 
         // GET: Emails
@@ -90,6 +97,7 @@ namespace MailArchiver.Controllers
                 model = new SearchViewModel();
             }
             if (model.PageNumber <= 0) model.PageNumber = 1;
+
             
             // Validate and set page size to allowed values
             var allowedPageSizes = new[] { 20, 50, 75, 100, 150 };
@@ -116,34 +124,8 @@ namespace MailArchiver.Controllers
                 model.DirectionOptions[2].Text = _localizer["Outgoing"];
             }
 
-            // Store search state for return navigation
-            StoreSearchState(model);
-
             // Get current user's allowed accounts
-            List<int> allowedAccountIds = null;
-            var authService = HttpContext.RequestServices.GetService<MailArchiver.Services.IAuthenticationService>();
-            var userService = HttpContext.RequestServices.GetService<IUserService>();
-            
-            if (authService != null && userService != null && !authService.IsCurrentUserAdmin(HttpContext))
-            {
-                var username = authService.GetCurrentUserDisplayName(HttpContext);
-                var user = await userService.GetUserByUsernameAsync(username);
-                if (user != null)
-                {
-                    var userAccounts = await userService.GetUserMailAccountsAsync(user.Id);
-                    allowedAccountIds = userAccounts.Select(a => a.Id).ToList();
-                    
-                    // Log for debugging
-                    _logger.LogInformation("User {Username} has access to {Count} accounts: {AccountIds}", 
-                        username, allowedAccountIds.Count, string.Join(", ", allowedAccountIds));
-                }
-                else
-                {
-                    // If user not found, set empty list to prevent access to any emails
-                    allowedAccountIds = new List<int>();
-                    _logger.LogWarning("User {Username} not found in database", username);
-                }
-            }
+            var allowedAccountIds = await GetAllowedAccountIdsAsync();
 
             // Konten für die Dropdown-Liste laden (nur erlaubte Konten für Nicht-Admins)
             var accountsQuery = _context.MailAccounts.AsQueryable();
@@ -202,29 +184,47 @@ namespace MailArchiver.Controllers
             // Load folder tree for the selected account (or all accounts if none selected)
             model.FolderTree = await _emailCoreService.GetFolderTreeAsync(model.SelectedAccountId, allowedAccountIds);
 
-            // Berechnen der Anzahl zu überspringender Elemente für die Paginierung
-            int skip = (model.PageNumber - 1) * model.PageSize;
-
             // For non-admin users, we need to ensure they only see emails from their assigned accounts
             // If they haven't selected a specific account, we still need to filter by their allowed accounts
             int? accountIdForSearch = model.SelectedAccountId;
-            
+
+            async Task<(List<ArchivedEmail> Emails, int TotalCount)> SearchPageAsync(int pageNumber)
+            {
+                return await _emailCoreService.SearchEmailsAsync(
+                    model.SearchTerm,
+                    model.FromDate,
+                    model.ToDate,
+                    accountIdForSearch,
+                    model.SelectedFolder,
+                    model.IsOutgoing,
+                    (pageNumber - 1) * model.PageSize,
+                    model.PageSize,
+                    allowedAccountIds,
+                    model.SortBy ?? "SentDate",
+                    model.SortOrder ?? "desc");
+            }
+
             // Suche durchführen
-            var (emails, totalCount) = await _emailCoreService.SearchEmailsAsync(
-                model.SearchTerm,
-                model.FromDate,
-                model.ToDate,
-                accountIdForSearch,
-                model.SelectedFolder,
-                model.IsOutgoing,
-                skip,
-                model.PageSize,
-                allowedAccountIds,
-                model.SortBy ?? "SentDate",
-                model.SortOrder ?? "desc");
+            var (emails, totalCount) = await SearchPageAsync(model.PageNumber);
 
             model.SearchResults = emails;
             model.TotalResults = totalCount;
+
+            // A page number past the end (typed into the jump box, or a stale link after
+            // the archive changed) would render an empty list although results exist.
+            // Land on the last page instead.
+            var lastPage = Math.Max(1, (int)Math.Ceiling(totalCount / (double)model.PageSize));
+            if (totalCount > 0 && model.PageNumber > lastPage)
+            {
+                model.PageNumber = lastPage;
+                (emails, totalCount) = await SearchPageAsync(lastPage);
+                model.SearchResults = emails;
+                model.TotalResults = totalCount;
+            }
+
+            // Store search state for return navigation, after the page number has been
+            // clamped, so "back to the list" does not return to an empty page.
+            StoreSearchState(model);
 
                     // Log the search action
                     if (_accessLogService != null && _serviceScopeFactory != null)
@@ -279,6 +279,7 @@ namespace MailArchiver.Controllers
             
             // Selection-Optionen für die View verfügbar machen
             ViewBag.MaxSelectableEmails = _selectionOptions.MaxSelectableEmails;
+            ViewBag.MaxBulkDeleteEmails = _deletionPolicy.MaxBulkDeleteEmails;
 
             // Aktive Jobs für die View
             if (_batchRestoreService != null)
@@ -288,6 +289,93 @@ namespace MailArchiver.Controllers
             }
 
             return View(model);
+        }
+
+        // GET: Emails/SelectAllMatchingIds
+        // IDs of every email matching the current search, for "select all matching" in
+        // selection mode. Capped at Selection:MaxSelectableEmails, the same limit the page
+        // enforces when selecting by hand.
+        [HttpGet]
+        public async Task<JsonResult> SelectAllMatchingIds(SearchViewModel model)
+        {
+            model ??= new SearchViewModel();
+            var allowedAccountIds = await GetAllowedAccountIdsAsync();
+
+            var (ids, totalCount) = await _emailCoreService.SearchEmailIdsAsync(
+                model.SearchTerm,
+                model.FromDate,
+                model.ToDate,
+                model.SelectedAccountId,
+                model.SelectedFolder,
+                model.IsOutgoing,
+                _selectionOptions.MaxSelectableEmails,
+                allowedAccountIds,
+                model.SortBy ?? "SentDate",
+                model.SortOrder ?? "desc");
+
+            return Json(new { ids, totalCount, truncated = totalCount > ids.Count });
+        }
+
+        /// <summary>
+        /// Account IDs the current user may see, or null for admins (no restriction).
+        /// An empty list means the user may see no emails at all.
+        /// </summary>
+        private async Task<List<int>?> GetAllowedAccountIdsAsync()
+        {
+            // Admins are unrestricted. A user we cannot resolve gets an empty list,
+            // not null: null would silently widen the query to the whole archive.
+            if (_authService == null || _authService.IsCurrentUserAdmin(HttpContext))
+                return null;
+
+            var userService = HttpContext.RequestServices.GetService<IUserService>();
+            var username = _authService.GetCurrentUserDisplayName(HttpContext);
+            if (userService == null || string.IsNullOrEmpty(username))
+                return new List<int>();
+
+            var user = await userService.GetUserByUsernameAsync(username);
+            if (user == null)
+            {
+                _logger.LogWarning("User {Username} not found in database", username);
+                return new List<int>();
+            }
+
+            var userAccounts = await userService.GetUserMailAccountsAsync(user.Id);
+            var allowedAccountIds = userAccounts.Select(a => a.Id).ToList();
+
+            _logger.LogInformation("User {Username} has access to {Count} accounts: {AccountIds}",
+                username, allowedAccountIds.Count, string.Join(", ", allowedAccountIds));
+
+            return allowedAccountIds;
+        }
+
+        /// <summary>
+        /// True when the email belongs to an account the caller may access. Admins keep
+        /// unrestricted access. Every copy/restore path must check the SOURCE email with
+        /// this, not only the target account: without it a restricted user can restore any
+        /// archived email into a mailbox they control.
+        /// </summary>
+        private async Task<bool> CanAccessEmailAsync(int emailId, List<int>? allowedAccountIds)
+        {
+            if (allowedAccountIds == null)
+                return true;
+
+            return await _context.ArchivedEmails
+                .AnyAsync(e => e.Id == emailId && allowedAccountIds.Contains(e.MailAccountId));
+        }
+
+        /// <summary>
+        /// Restricts a set of email ids to those in accounts the caller may access. Admins
+        /// keep every id; an empty result means none of the requested ids is accessible.
+        /// </summary>
+        private async Task<List<int>> FilterAccessibleEmailIdsAsync(List<int> emailIds, List<int>? allowedAccountIds)
+        {
+            if (allowedAccountIds == null || emailIds.Count == 0)
+                return emailIds;
+
+            return await _context.ArchivedEmails
+                .Where(e => emailIds.Contains(e.Id) && allowedAccountIds.Contains(e.MailAccountId))
+                .Select(e => e.Id)
+                .ToListAsync();
         }
 
         // GET: Emails/Details/5
@@ -330,6 +418,10 @@ namespace MailArchiver.Controllers
             {
                 Email = email,
                 AccountName = email.MailAccount?.Name ?? "Unknown account",
+                HasRawMessage = _rawMessageStore != null
+                    ? await _rawMessageStore.ExistsAsync(id)
+                    : await _context.RawMessages.AnyAsync(r => r.ArchivedEmailId == id),
+                RawMessagesEnabled = _rawMessageOptions.Enabled,
                 FormattedHtmlBody = !string.IsNullOrEmpty(htmlBodyToDisplay) 
                     ? ResolveInlineImagesInHtml(SanitizeHtml(htmlBodyToDisplay, _viewOptions.BlockExternalResources), email.Attachments) 
                     : string.Empty,
@@ -339,6 +431,19 @@ namespace MailArchiver.Controllers
                 HasHtmlBody = !string.IsNullOrEmpty(htmlBodyToDisplay),
                 HasPlainTextBody = !string.IsNullOrEmpty(textBodyToDisplay),
             };
+
+            foreach (var attachment in email.Attachments)
+            {
+                if (!XRechnungDetector.LooksLikeXml(attachment.FileName, attachment.ContentType))
+                    continue;
+
+                var content = attachment.Content;
+                if (content.Length == 0 || content.Length > XRechnungDetector.MaxBytes)
+                    continue;
+
+                if (XRechnungDetector.Detect(content) != null)
+                    model.XRechnungAttachmentIds.Add(attachment.Id);
+            }
 
             // Store return URL in ViewBag
             ViewBag.ReturnUrl = returnUrl ?? Url.Action("Index");
@@ -978,29 +1083,27 @@ namespace MailArchiver.Controllers
             if (ModelState.ContainsKey("EmailSubject"))
                 ModelState.Remove("EmailSubject");
 
-            // Get current user's allowed accounts
-            List<int> allowedAccountIds = null;
-            var authService = HttpContext.RequestServices.GetService<MailArchiver.Services.IAuthenticationService>();
-            var userService = HttpContext.RequestServices.GetService<IUserService>();
-            
-            if (authService != null && userService != null && !authService.IsCurrentUserAdmin(HttpContext))
-            {
-                var username = authService.GetCurrentUserDisplayName(HttpContext);
-                var user = await userService.GetUserByUsernameAsync(username);
-                if (user != null)
-                {
-                    var userAccounts = await userService.GetUserMailAccountsAsync(user.Id);
-                    allowedAccountIds = userAccounts.Select(a => a.Id).ToList();
-                }
-            }
+            // Accounts the caller may use. Null means admin (no restriction), an empty
+            // list means the caller may access no account at all.
+            var allowedAccountIds = await GetAllowedAccountIdsAsync();
 
             // Check if user is allowed to access the target account
             if (allowedAccountIds != null && !allowedAccountIds.Contains(model.TargetAccountId))
             {
                 _logger.LogWarning("User {Username} attempted to restore email to account {AccountId} which they don't have access to", 
-                    authService?.GetCurrentUserDisplayName(HttpContext), model.TargetAccountId);
+                    _authService?.GetCurrentUserDisplayName(HttpContext), model.TargetAccountId);
                 TempData["ErrorMessage"] = "You do not have access to the selected account.";
                 return RedirectToAction(nameof(Details), new { id = model.EmailId });
+            }
+
+            // SECURITY: the SOURCE email must also be in scope. Checking only the target
+            // account let a restricted user copy any archived email into a mailbox they
+            // control, which is a full archive exfiltration path (IDOR).
+            if (!await CanAccessEmailAsync(model.EmailId, allowedAccountIds))
+            {
+                _logger.LogWarning("User {Username} attempted to restore email {EmailId} from an account they don't have access to",
+                    _authService?.GetCurrentUserDisplayName(HttpContext), model.EmailId);
+                return NotFound();
             }
 
             if (!ModelState.IsValid)
@@ -1185,6 +1288,18 @@ namespace MailArchiver.Controllers
             if (ids == null || !ids.Any())
             {
                 TempData["ErrorMessage"] = "No emails selected for batch operation.";
+                return Redirect(returnUrl ?? Url.Action("Index"));
+            }
+
+            // SECURITY: the ids come straight from the request. Restrict them to the
+            // caller's account scope before they reach the session or a background job.
+            var allowedAccountIds = await GetAllowedAccountIdsAsync();
+            ids = await FilterAccessibleEmailIdsAsync(ids, allowedAccountIds);
+            if (!ids.Any())
+            {
+                _logger.LogWarning("User {Username} attempted a batch restore of emails outside their account scope",
+                    _authService?.GetCurrentUserDisplayName(HttpContext));
+                TempData["ErrorMessage"] = "You do not have access to any of the selected emails.";
                 return Redirect(returnUrl ?? Url.Action("Index"));
             }
 
@@ -1470,27 +1585,15 @@ namespace MailArchiver.Controllers
             _logger.LogInformation("BatchRestore POST method called with {Count} emails, Target Account ID: {AccountId}, Target Folder: {Folder}",
                 model.SelectedEmailIds.Count, model.TargetAccountId, model.TargetFolder);
 
-            // Get current user's allowed accounts
-            List<int> allowedAccountIds = null;
-            var authService = HttpContext.RequestServices.GetService<MailArchiver.Services.IAuthenticationService>();
-            var userService = HttpContext.RequestServices.GetService<IUserService>();
-            
-            if (authService != null && userService != null && !authService.IsCurrentUserAdmin(HttpContext))
-            {
-                var username = authService.GetCurrentUserDisplayName(HttpContext);
-                var user = await userService.GetUserByUsernameAsync(username);
-                if (user != null)
-                {
-                    var userAccounts = await userService.GetUserMailAccountsAsync(user.Id);
-                    allowedAccountIds = userAccounts.Select(a => a.Id).ToList();
-                }
-            }
+            // Accounts the caller may use. Null means admin (no restriction), an empty
+            // list means the caller may access no account at all.
+            var allowedAccountIds = await GetAllowedAccountIdsAsync();
 
             // Check if user is allowed to access the target account
             if (allowedAccountIds != null && !allowedAccountIds.Contains(model.TargetAccountId))
             {
                 _logger.LogWarning("User {Username} attempted to restore emails to account {AccountId} which they don't have access to", 
-                    authService?.GetCurrentUserDisplayName(HttpContext), model.TargetAccountId);
+                    _authService?.GetCurrentUserDisplayName(HttpContext), model.TargetAccountId);
                 TempData["ErrorMessage"] = "You do not have access to the selected account.";
                 return Redirect(model.ReturnUrl ?? Url.Action("Index"));
             }
@@ -1503,6 +1606,18 @@ namespace MailArchiver.Controllers
                 {
                     model.SelectedEmailIds = idsString.Split(',').Select(int.Parse).ToList();
                 }
+            }
+
+            // SECURITY: only copy emails the caller may read. The target check above
+            // protects the destination, not the source; without this filter a restricted
+            // user could post arbitrary email ids and exfiltrate them.
+            model.SelectedEmailIds = await FilterAccessibleEmailIdsAsync(model.SelectedEmailIds, allowedAccountIds);
+            if (!model.SelectedEmailIds.Any())
+            {
+                _logger.LogWarning("User {Username} attempted a batch restore of emails outside their account scope",
+                    _authService?.GetCurrentUserDisplayName(HttpContext));
+                TempData["ErrorMessage"] = "You do not have access to any of the selected emails.";
+                return Redirect(model.ReturnUrl ?? Url.Action("Index"));
             }
 
             if (!ModelState.IsValid)
@@ -1660,6 +1775,17 @@ namespace MailArchiver.Controllers
         [HttpGet]
         public async Task<IActionResult> StartAsyncBatchRestoreFromAccount(int accountId, string returnUrl = null, bool preserveFolders = false)
         {
+            // SECURITY: this action loads every email id of the account into the session
+            // and is the source side of the restore flow. Without the account check a
+            // restricted user could select an account they cannot read.
+            var allowedAccountIds = await GetAllowedAccountIdsAsync();
+            if (allowedAccountIds != null && !allowedAccountIds.Contains(accountId))
+            {
+                _logger.LogWarning("User {Username} attempted an account restore for account {AccountId} outside their scope",
+                    _authService?.GetCurrentUserDisplayName(HttpContext), accountId);
+                return NotFound();
+            }
+
             var account = await _context.MailAccounts.FindAsync(accountId);
             if (account == null)
             {
@@ -1960,28 +2086,27 @@ namespace MailArchiver.Controllers
             var emailIds = idsString.Split(',').Select(int.Parse).ToList();
             _logger.LogInformation("Retrieved {Count} email IDs from session for async batch restore", emailIds.Count);
 
-            // Get current user's allowed accounts
-            List<int> allowedAccountIds = null;
-            var authService = HttpContext.RequestServices.GetService<MailArchiver.Services.IAuthenticationService>();
-            var userService = HttpContext.RequestServices.GetService<IUserService>();
-            
-            if (authService != null && userService != null && !authService.IsCurrentUserAdmin(HttpContext))
-            {
-                var username = authService.GetCurrentUserDisplayName(HttpContext);
-                var user = await userService.GetUserByUsernameAsync(username);
-                if (user != null)
-                {
-                    var userAccounts = await userService.GetUserMailAccountsAsync(user.Id);
-                    allowedAccountIds = userAccounts.Select(a => a.Id).ToList();
-                }
-            }
+            // Accounts the caller may use. Null means admin (no restriction), an empty
+            // list means the caller may access no account at all.
+            var allowedAccountIds = await GetAllowedAccountIdsAsync();
 
             // Check if user is allowed to access the target account
             if (allowedAccountIds != null && !allowedAccountIds.Contains(model.TargetAccountId))
             {
                 _logger.LogWarning("User {Username} attempted to restore emails to account {AccountId} which they don't have access to", 
-                    authService?.GetCurrentUserDisplayName(HttpContext), model.TargetAccountId);
+                    _authService?.GetCurrentUserDisplayName(HttpContext), model.TargetAccountId);
                 TempData["ErrorMessage"] = "You do not have access to the selected account.";
+                return Redirect(model.ReturnUrl ?? Url.Action("Index"));
+            }
+
+            // SECURITY: the session can carry ids that were planted before this action
+            // (or by a caller that skipped the earlier filter). Restrict them again.
+            emailIds = await FilterAccessibleEmailIdsAsync(emailIds, allowedAccountIds);
+            if (emailIds.Count == 0)
+            {
+                _logger.LogWarning("User {Username} attempted an async batch restore of emails outside their account scope",
+                    _authService?.GetCurrentUserDisplayName(HttpContext));
+                TempData["ErrorMessage"] = "You do not have access to any of the selected emails.";
                 return Redirect(model.ReturnUrl ?? Url.Action("Index"));
             }
 
@@ -2962,6 +3087,8 @@ namespace MailArchiver.Controllers
             {
                 _context.ArchivedEmails.Remove(email);
                 await _context.SaveChangesAsync();
+
+                await DeleteStoredOriginalAsync(id);
                 
                 _logger.LogInformation("Email with ID {EmailId} successfully deleted by admin", id);
                 
@@ -3104,6 +3231,8 @@ namespace MailArchiver.Controllers
                         _context.ArchivedEmails.Remove(email);
                         await _context.SaveChangesAsync();
                         deletedCount++;
+
+                        await DeleteStoredOriginalAsync(id);
                         
                         _logger.LogInformation("Email with ID {EmailId} successfully deleted by admin", id);
                         
@@ -3147,6 +3276,149 @@ namespace MailArchiver.Controllers
             return Redirect(returnUrl ?? Url.Action("Index"));
         }
         
+        // GET: Emails/DeletionPreview
+        [HttpGet]
+        [SelfManagerRequired]
+        public async Task<IActionResult> DeletionPreview(SearchViewModel model)
+        {
+            var filter = BuildDeletionFilter(model, await GetAllowedAccountIdsAsync());
+            var (deletable, locked, _) = await _emailCoreService.CountEmailsForDeletionAsync(filter);
+
+            return Json(new
+            {
+                deletable,
+                locked,
+                max = _deletionPolicy.MaxBulkDeleteEmails
+            });
+        }
+
+        // POST: Emails/DeleteByFilter
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [SelfManagerRequired]
+        public async Task<IActionResult> DeleteByFilter(SearchViewModel model, int confirmCount, string returnUrl = null)
+        {
+            if (!_deletionPolicy.DeletionAllowed)
+            {
+                _logger.LogWarning("Bulk email deletion by filter blocked by policy (DeletionPolicy:DeletionAllowed=false).");
+                TempData["ErrorMessage"] = _localizer?["DeletionDisabledMessage"] ?? "Email deletion is disabled by configuration.";
+                return Redirect(returnUrl ?? Url.Action("Index"));
+            }
+
+            if (!HasDeletionFilter(model))
+            {
+                TempData["ErrorMessage"] = _localizer?["DeleteAllMatchesFilterRequired"]
+                    ?? "Narrow the result set first (search term, date, folder or account).";
+                return Redirect(returnUrl ?? Url.Action("Index"));
+            }
+
+            if (_emailDeletionService == null)
+            {
+                TempData["ErrorMessage"] = "Email deletion service is not available.";
+                return Redirect(returnUrl ?? Url.Action("Index"));
+            }
+
+            var filter = BuildDeletionFilter(model, await GetAllowedAccountIdsAsync());
+            var (deletable, locked, maxId) = await _emailCoreService.CountEmailsForDeletionAsync(filter);
+
+            if (deletable == 0)
+            {
+                TempData["ErrorMessage"] = locked > 0
+                    ? _localizer["DeleteAllMatchesNoMatchesLocked", locked].Value
+                    : _localizer["DeleteAllMatchesNoMatches"].Value;
+                return Redirect(returnUrl ?? Url.Action("Index"));
+            }
+
+            if (deletable > _deletionPolicy.MaxBulkDeleteEmails)
+            {
+                TempData["ErrorMessage"] = _localizer["DeleteAllMatchesCapExceeded",
+                    deletable, _deletionPolicy.MaxBulkDeleteEmails].Value;
+                return Redirect(returnUrl ?? Url.Action("Index"));
+            }
+
+            // The confirmation is the number the user typed. A mismatch means the
+            // result set changed since the preview (for example a running sync), so
+            // the user has to look at it again instead of deleting a different set.
+            if (deletable != confirmCount)
+            {
+                _logger.LogWarning(
+                    "Bulk deletion by filter aborted: confirmed {Confirmed}, current {Current}",
+                    confirmCount, deletable);
+                TempData["ErrorMessage"] = _localizer["DeleteAllMatchesCountChanged", confirmCount, deletable].Value;
+                return Redirect(returnUrl ?? Url.Action("Index"));
+            }
+
+            filter.UpperBoundId = maxId;
+            filter.Description = DescribeFilter(model);
+
+            var username = _authService?.GetCurrentUserDisplayName(HttpContext);
+            var job = new EmailDeletionJob
+            {
+                Filter = filter,
+                TotalEmails = deletable,
+                UserId = username ?? "Anonymous"
+            };
+
+            var jobId = _emailDeletionService.QueueJob(job);
+
+            if (_accessLogService != null && !string.IsNullOrEmpty(username))
+            {
+                await _accessLogService.LogAccessAsync(username, AccessLogType.Deletion,
+                    searchParameters: Truncate($"Queued bulk deletion by filter ({deletable:N0} emails): {filter.Description}", 255));
+            }
+
+            _logger.LogInformation(
+                "Queued bulk deletion by filter for {Count} emails (job {JobId})", deletable, jobId);
+
+            TempData["SuccessMessage"] = _localizer["DeleteAllMatchesQueued", deletable, jobId].Value;
+
+            return RedirectToAction("EmailDeletionStatus", new { jobId });
+        }
+
+        /// <summary>
+        /// An empty filter would mean "every email in the archive". Require at least
+        /// one narrowing criterion so a forgotten filter cannot turn into a full wipe.
+        /// </summary>
+        private static bool HasDeletionFilter(SearchViewModel model)
+            => !string.IsNullOrWhiteSpace(model.SearchTerm)
+               || model.FromDate.HasValue
+               || model.ToDate.HasValue
+               || model.SelectedAccountId.HasValue
+               || !string.IsNullOrWhiteSpace(model.SelectedFolder);
+
+        private static EmailDeletionFilter BuildDeletionFilter(SearchViewModel model, List<int>? allowedAccountIds)
+            => new()
+            {
+                SearchTerm = string.IsNullOrWhiteSpace(model.SearchTerm) ? null : model.SearchTerm.Trim(),
+                FromDate = model.FromDate,
+                ToDate = model.ToDate,
+                AccountId = model.SelectedAccountId,
+                FolderName = string.IsNullOrWhiteSpace(model.SelectedFolder) ? null : model.SelectedFolder,
+                IsOutgoing = model.IsOutgoing,
+                AllowedAccountIds = allowedAccountIds
+            };
+
+        private static string DescribeFilter(SearchViewModel model)
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(model.SearchTerm))
+                parts.Add($"term:{model.SearchTerm.Trim()}");
+            if (model.FromDate.HasValue)
+                parts.Add($"from:{model.FromDate:yyyy-MM-dd}");
+            if (model.ToDate.HasValue)
+                parts.Add($"to:{model.ToDate:yyyy-MM-dd}");
+            if (model.SelectedAccountId.HasValue)
+                parts.Add($"account:{model.SelectedAccountId}");
+            if (!string.IsNullOrWhiteSpace(model.SelectedFolder))
+                parts.Add($"folder:{model.SelectedFolder}");
+            if (model.IsOutgoing.HasValue)
+                parts.Add($"direction:{(model.IsOutgoing.Value ? "out" : "in")}");
+            return string.Join(", ", parts);
+        }
+
+        private static string Truncate(string value, int maxLength)
+            => value.Length <= maxLength ? value : value.Substring(0, maxLength);
+
         // GET: Emails/EmailDeletionStatus
         [HttpGet]
         [SelfManagerRequired]
@@ -3303,5 +3575,31 @@ namespace MailArchiver.Controllers
                 return Redirect(returnUrl ?? Url.Action("Index"));
             }
         }
+
+        /// <summary>
+        /// Removes the stored original of an email. Called <b>after</b> its row has been deleted:
+        /// the metadata row goes with the email through the cascade, but a filesystem-backed
+        /// original is a file outside the database that no cascade can reach. Deleting the bytes
+        /// first would lose the original if the email deletion failed.
+        /// </summary>
+        private async Task DeleteStoredOriginalAsync(int emailId)
+        {
+        var rawMessageStore = HttpContext.RequestServices.GetService<IRawMessageStore>();
+        if (rawMessageStore == null)
+        {
+            return;
+        }
+
+        try
+        {
+            await rawMessageStore.DeleteAsync(new[] { emailId });
+        }
+        catch (Exception ex)
+        {
+            // The email deletion must not fail because of this; the orphan collector
+            // removes the leftover file on its next run.
+            _logger.LogError(ex, "Could not delete the stored original of email {EmailId}", emailId);
+        }
     }
+}
 }

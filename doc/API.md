@@ -40,6 +40,8 @@ deletes data.
   - [Download message (.eml)](#download-message-eml)
   - [Download original message](#download-original-message)
   - [Stats](#stats)
+  - [Health](#health)
+  - [Metrics](#metrics)
 - [Data types](#data-types)
 - [Access logging](#access-logging)
 - [OpenAPI and Swagger UI](#openapi-and-swagger-ui)
@@ -400,7 +402,7 @@ Whether an email has one is shown by `hasRawMessage` in
 | --- | --- |
 | `X-Raw-Message-Sha256` | SHA-256 of the returned bytes, recorded when the message was stored |
 | `X-Raw-Message-Source` | `imap`, `graph`, `eml-file` (exact copies) or `serialized` (re-written by the parser, line endings normalized to CRLF) |
-| `X-Raw-Message-Storage` | `postgres` or `filesystem` — where the bytes were read from (see [Storage Backend](Setup.md#storage-backend)) |
+| `X-Raw-Message-Storage` | `postgres` or `filesystem` — where the bytes were read from (see [Storage backend](RawMessages.md#storage-backend)) |
 
 The bytes may live in the database or in a file, depending on
 `RawMessages:Storage` at the time the message was archived; the endpoint
@@ -460,6 +462,36 @@ curl -H "Authorization: Bearer $KEY" https://host/api/v1/stats
 | `accounts` | int | Mail accounts visible to the caller |
 | `attachments` | int | Attachments on those visible messages |
 | `databaseSizeInMB` | string | Whole PostgreSQL database size in MB; empty for non-admin keys |
+
+### Health
+
+```
+GET /api/v1/health/live
+GET /api/v1/health/ready
+GET /api/v1/health
+```
+
+All three require an admin API key. `health/live` answers 200 without touching any
+dependency. `health/ready` checks PostgreSQL and the archive schema and returns 503 when
+either is unavailable. `health` also runs the sync freshness check and returns `Degraded`
+(HTTP 200) when an enabled account has not synced within `Health:SyncStaleMinutes`.
+
+```json
+{"status":"Healthy","checks":{"database":"Healthy","sync":"Healthy"}}
+```
+
+The full description, including the 401/403/404 behavior and the Docker health check, is in
+**[Health and Metrics](Monitoring.md)**.
+
+### Metrics
+
+```
+GET /api/v1/metrics
+```
+
+Returns Prometheus text exposition format. Requires an admin API key and
+`Metrics:Enabled=true`; otherwise the endpoint returns 404. The metric names, labels and
+alert examples are in **[Health and Metrics](Monitoring.md)**.
 
 ## Data types
 
